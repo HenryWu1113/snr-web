@@ -2,8 +2,8 @@
 
 ## Advanced Trading Journal & R-Multiple Analyzer
 
-**版本：** 1.1.0  
-**最後更新：** 2025-11-24  
+**版本：** 1.2.0
+**最後更新：** 2025-11-25  
 **專案類型：** Next.js Web Application  
 **開發方法：** Specification-Driven Development (SDD)
 
@@ -52,18 +52,20 @@
 
 ### 2.1 身份驗證
 
-**US-001：GitHub 登入**
+**US-001：使用者登入**
 
 - **作為** 使用者
-- **我想要** 使用 GitHub 帳號快速登入系統
-- **以便** 安全地存取我的交易紀錄，無需額外管理帳號密碼
+- **我想要** 使用 Email 與密碼或第三方 OAuth (GitHub) 快速登入系統
+- **以便** 安全地存取我的交易紀錄
 
 **驗收標準：**
 
-- 系統提供 GitHub OAuth 登入按鈕
+- 系統提供 Email/密碼登入表單
+- 系統提供 GitHub OAuth 登入按鈕（選配）
 - 登入成功後自動跳轉至主要功能頁面
 - 登入失敗時顯示明確的錯誤訊息
-- 登入狀態在合理時間內（至少 7 天）保持有效
+- 登入狀態持久化（使用 Supabase Session）
+- 支援「記住我」功能（Session 有效期延長）
 
 ### 2.2 交易紀錄管理
 
@@ -252,29 +254,71 @@
 
 ### 3.1 身份驗證系統
 
-#### 3.1.1 GitHub OAuth 登入
+#### 3.1.1 Supabase Auth 驗證
 
 **功能描述：**
-系統僅支援透過 GitHub OAuth 進行身份驗證，無需實作本地帳號註冊與登入功能。
+系統使用 Supabase Authentication 處理身份驗證，支援多種登入方式。
+
+**支援的登入方式：**
+
+1. **Email + Password（主要方式）**
+   - 本地帳號註冊與登入
+   - Email 驗證（可選）
+   - 密碼重設功能
+
+2. **OAuth Providers（選配）**
+   - GitHub OAuth
+   - Google OAuth（未來擴展）
 
 **技術需求：**
 
-- 使用 NextAuth.js 處理 OAuth 流程
-- 配置 GitHub OAuth App（需要 Client ID 與 Client Secret）
-- Session 管理採用 JWT 或 Database Session
+- 使用 `@supabase/supabase-js` 處理認證
+- 使用 `@supabase/auth-helpers-nextjs` 整合 Next.js
+- Session 管理由 Supabase 自動處理
+- 使用 Supabase Auth UI（可選，快速建立登入介面）
 
-**流程：**
+**Email/密碼登入流程：**
+
+1. 使用者填寫 Email 與密碼
+2. 呼叫 `supabase.auth.signInWithPassword({ email, password })`
+3. 驗證成功後，Supabase 自動建立 Session
+4. 前端接收 Session 並跳轉至主頁面
+5. 後續請求自動帶入 Session Token
+
+**GitHub OAuth 登入流程：**
 
 1. 使用者點擊「使用 GitHub 登入」按鈕
-2. 跳轉至 GitHub 授權頁面
-3. 使用者授權後回調至系統
-4. 系統建立或更新使用者資料
-5. 建立 Session 並跳轉至主頁面
+2. 呼叫 `supabase.auth.signInWithOAuth({ provider: 'github' })`
+3. 跳轉至 GitHub 授權頁面
+4. 使用者授權後回調至系統
+5. Supabase 自動建立或更新使用者資料
+6. 建立 Session 並跳轉至主頁面
+
+**註冊流程：**
+
+1. 使用者填寫 Email、密碼
+2. 呼叫 `supabase.auth.signUp({ email, password })`
+3. （可選）發送 Email 驗證信
+4. 註冊成功後自動登入
+
+**登出流程：**
+
+1. 呼叫 `supabase.auth.signOut()`
+2. 清除本地 Session
+3. 跳轉至登入頁面
+
+**Session 管理：**
+
+- Session 預設有效期：7 天
+- 支援 Refresh Token 自動更新
+- 使用 `supabase.auth.getSession()` 取得當前 Session
+- 使用 `supabase.auth.onAuthStateChange()` 監聽登入狀態變化
 
 **權限控制：**
 
-- 僅允許特定 GitHub 帳號登入（透過環境變數配置白名單）
-- 非授權帳號登入時顯示拒絕訊息
+- （可選）透過 Supabase Database Trigger 限制特定 Email 註冊
+- 使用 Row Level Security (RLS) 確保使用者只能存取自己的資料
+- 在 `auth.users` 表中儲存使用者基本資訊
 
 ### 3.2 交易紀錄管理
 
@@ -589,13 +633,42 @@ interface OptionItem {
 
 ### 4.1 User（使用者）
 
+**說明：**
+使用者資料由 Supabase Auth 自動管理，儲存在 `auth.users` 表中。應用程式可透過 `auth.uid()` 取得當前使用者 ID。
+
+**Supabase Auth Users 表結構：**
+
 ```typescript
-interface User {
-  id: string // Primary Key (UUID)
-  githubId: string // GitHub User ID (Unique)
-  username: string // GitHub Username
-  email?: string // GitHub Email (可選)
-  avatarUrl?: string // GitHub Avatar URL
+// 此為 Supabase 內建表，系統自動管理
+// 位於 auth.users schema
+interface AuthUser {
+  id: string // Primary Key (UUID) - 由 Supabase 生成
+  email: string // 使用者 Email
+  encrypted_password: string // 加密密碼（Supabase 管理）
+  email_confirmed_at?: Date // Email 驗證時間
+  last_sign_in_at?: Date // 最後登入時間
+  created_at: Date // 建立時間
+  updated_at: Date // 更新時間
+
+  // OAuth 相關欄位
+  raw_user_meta_data?: {
+    avatar_url?: string // 頭像 URL（來自 OAuth）
+    full_name?: string // 全名（來自 OAuth）
+    provider_id?: string // OAuth Provider 的 User ID
+  }
+}
+```
+
+**應用層 User Profile（可選擴展）：**
+
+如需儲存額外的使用者資訊，可建立 `public.profiles` 表：
+
+```typescript
+interface UserProfile {
+  id: string // Primary Key (UUID) - 引用 auth.users.id
+  displayName?: string // 顯示名稱
+  avatarUrl?: string // 頭像 URL
+  timezone?: string // 時區設定
   createdAt: Date // 建立時間
   updatedAt: Date // 更新時間
 }
@@ -603,8 +676,10 @@ interface User {
 
 **資料庫索引：**
 
-- Primary Key: `id`
-- Unique Index: `githubId`
+- `auth.users` 由 Supabase 自動管理索引
+- 若建立 `profiles` 表：
+  - Primary Key: `id`
+  - Foreign Key: `id` REFERENCES `auth.users(id)` ON DELETE CASCADE
 
 ### 4.2 Trade（交易紀錄）
 
@@ -663,11 +738,31 @@ enum SessionType {
 
 **外鍵約束：**
 
-- `userId` REFERENCES `User(id)` ON DELETE CASCADE
+- `userId` REFERENCES `auth.users(id)` ON DELETE CASCADE
 - `commodityId` REFERENCES `Commodity(id)` ON DELETE SET NULL
 - `timeframeId` REFERENCES `Timeframe(id)` ON DELETE SET NULL
 - `trendlineTypeId` REFERENCES `TrendlineType(id)` ON DELETE SET NULL
 - Array 欄位的引用檢查需在應用層或透過觸發器實現
+
+**Row Level Security (RLS) 政策：**
+
+```sql
+-- 使用者只能查看自己的交易紀錄
+CREATE POLICY "Users can view own trades" ON trades
+  FOR SELECT USING (auth.uid() = userId);
+
+-- 使用者只能新增自己的交易紀錄
+CREATE POLICY "Users can insert own trades" ON trades
+  FOR INSERT WITH CHECK (auth.uid() = userId);
+
+-- 使用者只能更新自己的交易紀錄
+CREATE POLICY "Users can update own trades" ON trades
+  FOR UPDATE USING (auth.uid() = userId);
+
+-- 使用者只能刪除自己的交易紀錄
+CREATE POLICY "Users can delete own trades" ON trades
+  FOR DELETE USING (auth.uid() = userId);
+```
 
 **RR 計算邏輯說明：**
 
@@ -794,12 +889,13 @@ interface Timeframe {
 **理由：**
 
 - Supabase 提供完整的 PostgreSQL 資料庫服務與即時功能
-- 內建身份驗證系統（可與 NextAuth.js 整合）
+- 內建 Authentication 系統，無需額外配置認證服務
 - 支援複雜查詢、聚合運算與全文搜尋
 - Prisma 提供型別安全的 ORM，與 TypeScript 整合良好
 - 支援 Date、Decimal、JSON Array 等資料類型
-- 內建 Row Level Security (RLS) 提供資料安全
+- 內建 Row Level Security (RLS) 提供資料安全，自動限制使用者資料存取
 - 提供免費額度，適合個人專案
+- Supabase Auth 與 Database 無縫整合
 
 ---
 
@@ -1016,12 +1112,17 @@ interface SessionPerformance {
 **後端與 API：**
 
 - Next.js API Routes (App Router)
-- NextAuth.js v5 (身份驗證)
+- Next.js Server Actions (App Router，建議用於 Mutations)
+- Next.js Middleware（用於路由保護）
 
-**資料庫：**
+**資料庫與身份驗證：**
 
-- Supabase (PostgreSQL)
-- ORM: Prisma
+- Supabase (PostgreSQL + Authentication)
+- ORM: Prisma（資料存取）
+- Supabase Client SDK（身份驗證與 RLS）
+  - `@supabase/supabase-js` - 核心 SDK
+  - `@supabase/auth-helpers-nextjs` - Next.js 整合
+  - `@supabase/auth-ui-react`（可選）- 預建登入 UI 元件
 
 **圖片儲存：**
 
@@ -1038,24 +1139,16 @@ interface SessionPerformance {
 ### 6.2 環境變數配置
 
 ```env
-# GitHub OAuth
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
-
-# NextAuth
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your_nextauth_secret
-
-# 授權 GitHub 帳號白名單（逗號分隔）
-AUTHORIZED_GITHUB_IDS=12345678,87654321
-
-# Supabase 資料庫連線
-DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
-DIRECT_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
-
-# Supabase 公開金鑰（可選，若需使用 Supabase Client）
+# Supabase 設定（必填）
 NEXT_PUBLIC_SUPABASE_URL=https://[PROJECT-REF].supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Supabase 資料庫連線（用於 Prisma）
+DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+DIRECT_URL=postgresql://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
+
+# Supabase Service Role Key（後端專用，用於繞過 RLS）
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # 時區設定（盤勢判斷使用）
 TIMEZONE=Asia/Taipei
@@ -1064,7 +1157,19 @@ TIMEZONE=Asia/Taipei
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+
+# GitHub OAuth（選配，若啟用 GitHub 登入）
+# 在 Supabase Dashboard > Authentication > Providers 中配置
+# SUPABASE_AUTH_GITHUB_CLIENT_ID=your_github_client_id
+# SUPABASE_AUTH_GITHUB_SECRET=your_github_client_secret
 ```
+
+**重要說明：**
+
+- `NEXT_PUBLIC_*` 前綴的變數會暴露至瀏覽器端
+- `SUPABASE_SERVICE_ROLE_KEY` 僅在伺服器端使用，切勿暴露至前端
+- `ANON_KEY` 是公開金鑰，用於前端與 Supabase 通訊
+- Supabase Auth Providers（如 GitHub）在 Supabase Dashboard 中配置
 
 ### 6.3 資料庫遷移策略
 
@@ -1153,23 +1258,86 @@ npx prisma generate
 
 **身份驗證：**
 
-- 所有 API 端點（除了登入相關）都需驗證使用者身份
-- 使用 NextAuth.js 的 `getServerSession` 檢查 Session
+- 所有 API 端點（除了公開端點）都需驗證使用者身份
+- 使用 Supabase Auth 的 `getUser()` 或 `getSession()` 檢查 Session
+- Next.js Middleware 實作路由保護：
+  ```typescript
+  // middleware.ts
+  import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+  import { NextResponse } from 'next/server'
 
-**授權檢查：**
+  export async function middleware(req) {
+    const res = NextResponse.next()
+    const supabase = createMiddlewareClient({ req, res })
+    const { data: { session } } = await supabase.auth.getSession()
 
-- 檢查使用者的 GitHub ID 是否在白名單中
-- 拒絕未授權帳號的所有操作
+    if (!session) {
+      return NextResponse.redirect(new URL('/login', req.url))
+    }
+
+    return res
+  }
+
+  export const config = {
+    matcher: ['/dashboard/:path*', '/trades/:path*', '/analytics/:path*']
+  }
+  ```
+
+**授權檢查與資料安全：**
+
+- 使用 Supabase Row Level Security (RLS) 自動限制資料存取
+- 使用者只能存取自己的 `trades` 資料
+- RLS 政策在資料庫層級強制執行，無法繞過
+- （可選）使用 Service Role Key 在後端繞過 RLS（僅限管理功能）
+
+**API 路由安全：**
+
+```typescript
+// app/api/trades/route.ts
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+
+export async function GET(request: Request) {
+  const supabase = createRouteHandlerClient({ cookies })
+
+  // 驗證使用者身份
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
+  // 由於啟用 RLS，查詢會自動過濾為當前使用者的資料
+  const { data: trades } = await supabase
+    .from('trades')
+    .select('*')
+
+  return Response.json(trades)
+}
+```
 
 **資料驗證：**
 
 - 所有輸入資料需在後端進行二次驗證（使用 Zod）
-- 防止 SQL Injection（使用 Prisma ORM）
+- 防止 SQL Injection（使用 Prisma ORM + Supabase RLS）
 - 防止 XSS（React 預設防護 + 適當的 sanitization）
+
+**密碼安全：**
+
+- 密碼由 Supabase Auth 自動處理加密（bcrypt）
+- 支援密碼強度要求（在 Supabase Dashboard 配置）
+- 支援密碼重設功能（Email Magic Link）
 
 **HTTPS：**
 
 - 生產環境必須使用 HTTPS
+- Supabase 預設強制 HTTPS 連線
+
+**環境變數保護：**
+
+- `SUPABASE_SERVICE_ROLE_KEY` 僅在伺服器端使用
+- 使用 `.env.local` 檔案，不提交至版本控制
+- Vercel 部署時透過環境變數面板配置
 
 ### 6.6 效能要求
 
@@ -1509,18 +1677,18 @@ export function ThemeToggle() {
 
 **優先順序：P0（必須完成）**
 
-1. ✅ 專案初始化（Next.js + TypeScript + Prisma）
-2. ✅ GitHub OAuth 登入
-3. ✅ 資料庫 Schema 定義與 Migration
-4. ✅ 交易紀錄 CRUD 功能
+1. ⏳ 專案初始化（Next.js + TypeScript + Prisma + Supabase）
+2. ⏳ Supabase Auth 設定與 Email/密碼登入
+3. ⏳ 資料庫 Schema 定義與 Migration（含 RLS 政策）
+4. ⏳ 交易紀錄 CRUD 功能
    - 新增紀錄（含自動計算欄位）
    - 列表顯示（含分頁）
    - 編輯紀錄
    - 刪除紀錄
-5. ✅ 基本篩選與排序
-6. ✅ 動態選項管理（四種分類）
-7. ✅ 總體績效指標
-8. ✅ 基本部署至 Vercel
+5. ⏳ 基本篩選與排序
+6. ⏳ 動態選項管理（五種分類）
+7. ⏳ 總體績效指標
+8. ⏳ 基本部署至 Vercel
 
 **預計時程：** 2-3 週
 
@@ -1581,9 +1749,11 @@ export function ThemeToggle() {
 |                  | Zod               | latest   | Schema 驗證                  |
 | **資料視覺化**   | Recharts          | latest   | 圖表庫（shadcn charts 基礎） |
 |                  | Chart.js          | latest   | 備選圖表庫                   |
-| **後端與資料庫** | Supabase          | latest   | PostgreSQL 託管服務          |
-|                  | Prisma            | latest   | ORM（型別安全的資料庫存取）  |
-| **身份驗證**     | NextAuth.js       | v5       | OAuth 認證                   |
+| **後端與資料庫** | Supabase                       | latest | PostgreSQL 託管服務 + Authentication                |
+|                  | Prisma                         | latest | ORM（型別安全的資料庫存取）                         |
+| **身份驗證**     | @supabase/supabase-js          | latest | Supabase Client SDK                                 |
+|                  | @supabase/auth-helpers-nextjs  | latest | Supabase Auth Next.js 整合                          |
+|                  | @supabase/auth-ui-react        | latest | （可選）Supabase Auth UI 元件                       |
 | **圖片處理**     | Cloudinary        | latest   | 圖片上傳、儲存與管理         |
 |                  | next-cloudinary   | latest   | Cloudinary Next.js 整合      |
 | **日期處理**     | date-fns          | latest   | 日期格式化與計算             |
@@ -1604,8 +1774,12 @@ npx create-next-app@latest snr-web --typescript --tailwind --app
 # 安裝 shadcn/ui
 npx shadcn-ui@latest init
 
+# 安裝 Supabase 相關
+npm install @supabase/supabase-js @supabase/auth-helpers-nextjs
+npm install @supabase/auth-ui-react @supabase/auth-ui-shared  # 可選，若使用預建 UI
+
 # 安裝核心依賴
-npm install @prisma/client next-auth@beta zod react-hook-form @hookform/resolvers
+npm install @prisma/client zod react-hook-form @hookform/resolvers
 npm install date-fns recharts next-cloudinary next-themes
 
 # 安裝開發依賴
@@ -1614,6 +1788,10 @@ npm install -D eslint prettier eslint-config-prettier
 
 # 初始化 Prisma
 npx prisma init
+
+# Supabase 本地開發（可選）
+npm install -D supabase
+npx supabase init
 ```
 
 ### B. 術語表
@@ -1645,8 +1823,9 @@ npx prisma init
 - [React Documentation](https://react.dev/) - React 官方文件
 - [TypeScript Documentation](https://www.typescriptlang.org/docs/) - TypeScript 官方文件
 - [Supabase Documentation](https://supabase.com/docs) - Supabase 完整文件
+- [Supabase Auth Documentation](https://supabase.com/docs/guides/auth) - Supabase 認證指南
+- [Supabase Auth with Next.js](https://supabase.com/docs/guides/auth/auth-helpers/nextjs) - Next.js 整合指南
 - [Prisma Documentation](https://www.prisma.io/docs) - Prisma ORM 文件
-- [NextAuth.js Documentation](https://next-auth.js.org/) - NextAuth.js 認證文件
 - [shadcn/ui Documentation](https://ui.shadcn.com/) - shadcn/ui 元件庫
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs) - Tailwind CSS 文件
 - [Cloudinary Documentation](https://cloudinary.com/documentation) - Cloudinary 圖片處理
@@ -1682,10 +1861,11 @@ npx prisma init
 
 ### D. 修訂歷史
 
-| 版本  | 日期       | 修訂內容                                                                          | 作者         |
-| :---- | :--------- | :-------------------------------------------------------------------------------- | :----------- |
-| 1.1.0 | 2025-11-24 | 重大更新：新增交易商品選項、多選支援、RR 計算重構、Cloudinary 整合、Supabase 採用 | AI Assistant |
-| 1.0.0 | 2025-11-24 | 初版需求文件                                                                      | AI Assistant |
+| 版本  | 日期       | 修訂內容                                                                                       | 作者         |
+| :---- | :--------- | :--------------------------------------------------------------------------------------------- | :----------- |
+| 1.2.0 | 2025-11-25 | 重大更新：身份驗證從 NextAuth.js 改為 Supabase Auth，新增 RLS 安全政策，更新環境變數與技術堆疊 | AI Assistant |
+| 1.1.0 | 2025-11-24 | 重大更新：新增交易商品選項、多選支援、RR 計算重構、Cloudinary 整合、Supabase 採用              | AI Assistant |
+| 1.0.0 | 2025-11-24 | 初版需求文件                                                                                   | AI Assistant |
 
 ---
 

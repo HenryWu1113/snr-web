@@ -1,0 +1,337 @@
+/**
+ * 交易紀錄 DataTable 主組件
+ * 整合分頁、排序、篩選、欄位選擇等功能
+ */
+
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Inbox, SearchX } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import type {
+  TradeDataTableRequest,
+  TradeDataTableResponse,
+  MultiSortConfig,
+  TradeFilters,
+  ColumnVisibility,
+} from '@/types/datatable'
+import { TRADE_COLUMNS, DEFAULT_VISIBLE_COLUMNS, DEFAULT_SORT } from '@/config/trade-columns'
+import { DataTableToolbar } from './datatable-toolbar'
+import { DataTableColumnHeader } from './datatable-column-header'
+
+export function TradeDataTable() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // 狀態管理
+  const [data, setData] = useState<TradeDataTableResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false)
+
+  // DataTable 參數
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [sort, setSort] = useState<MultiSortConfig>(DEFAULT_SORT)
+  const [filters, setFilters] = useState<TradeFilters>({})
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(
+    DEFAULT_VISIBLE_COLUMNS.reduce((acc, id) => ({ ...acc, [id]: true }), {})
+  )
+
+  // 從資料庫載入使用者設定
+  useEffect(() => {
+    async function loadPreferences() {
+      try {
+        const [columnsRes, filtersRes] = await Promise.all([
+          fetch('/api/preferences?type=datatable_columns'),
+          fetch('/api/preferences?type=datatable_filters'),
+        ])
+
+        if (columnsRes.ok) {
+          const { settings } = await columnsRes.json()
+          if (settings) {
+            setColumnVisibility(settings)
+          }
+        }
+
+        if (filtersRes.ok) {
+          const { settings } = await filtersRes.json()
+          if (settings) {
+            setFilters(settings)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load preferences:', err)
+      } finally {
+        // 標記偏好設定已載入完成
+        setPreferencesLoaded(true)
+      }
+    }
+
+    loadPreferences()
+  }, [])
+
+  // 儲存欄位可見性設定
+  const saveColumnVisibility = useCallback(async (visibility: ColumnVisibility) => {
+    try {
+      await fetch('/api/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'datatable_columns',
+          settings: visibility,
+        }),
+      })
+    } catch (err) {
+      console.error('Failed to save column visibility:', err)
+    }
+  }, [])
+
+  // 儲存篩選條件設定
+  const saveFilters = useCallback(async (filters: TradeFilters) => {
+    try {
+      await fetch('/api/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'datatable_filters',
+          settings: filters,
+        }),
+      })
+    } catch (err) {
+      console.error('Failed to save filters:', err)
+    }
+  }, [])
+
+  // 載入資料
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+
+    const request: TradeDataTableRequest = {
+      pagination: { page, pageSize },
+      sort,
+      filters,
+      columnVisibility,
+    }
+
+    try {
+      const response = await fetch('/api/trades/datatable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch data')
+      }
+
+      const result: TradeDataTableResponse = await response.json()
+      setData(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+      console.error('Fetch error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [page, pageSize, sort, filters, columnVisibility])
+
+  // 當參數變化時重新載入資料（等待偏好設定載入完成）
+  useEffect(() => {
+    if (preferencesLoaded) {
+      fetchData()
+    }
+  }, [fetchData, preferencesLoaded])
+
+  // 處理排序
+  const handleSort = (field: string) => {
+    const column = TRADE_COLUMNS.find((col) => col.id === field)
+    if (!column?.sortable) return
+
+    setSort((prev) => {
+      const existing = prev.find((s) => s.field === field)
+
+      if (existing) {
+        // 切換排序方向：asc -> desc -> remove
+        if (existing.direction === 'asc') {
+          return prev.map((s) => (s.field === field ? { ...s, direction: 'desc' as const } : s))
+        } else {
+          return prev.filter((s) => s.field !== field)
+        }
+      } else {
+        // 新增排序
+        return [...prev, { field, direction: 'asc' as const }]
+      }
+    })
+
+    setPage(1) // 重置到第一頁
+  }
+
+  // 處理欄位可見性切換
+  const handleColumnVisibilityChange = (columnId: string, visible: boolean) => {
+    const newVisibility = { ...columnVisibility, [columnId]: visible }
+    setColumnVisibility(newVisibility)
+    saveColumnVisibility(newVisibility)
+  }
+
+  // 處理篩選器變更
+  const handleFiltersChange = (newFilters: TradeFilters) => {
+    setFilters(newFilters)
+    setPage(1)
+    saveFilters(newFilters)
+  }
+
+  // 可見欄位
+  const visibleColumns = TRADE_COLUMNS.filter((col) => columnVisibility[col.id])
+
+  return (
+    <div className="space-y-4">
+      {/* 工具列（篩選器、欄位選擇、匯出） */}
+      <DataTableToolbar
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        columnVisibility={columnVisibility}
+        onColumnVisibilityChange={handleColumnVisibilityChange}
+        columns={TRADE_COLUMNS}
+        data={data?.data || []}
+      />
+
+      {/* 表格 */}
+      <Card className="py-0">
+        <div className="relative w-full overflow-auto">
+          <Table>
+            <TableHeader className="sticky top-0 bg-background z-10">
+              <TableRow>
+                {visibleColumns.map((column) => (
+                  <TableHead key={column.id} style={{ width: column.width }}>
+                    <DataTableColumnHeader
+                      column={column}
+                      sort={sort}
+                      onSort={() => handleSort(column.id)}
+                    />
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                // Skeleton loading rows
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {visibleColumns.map((column) => (
+                      <TableCell key={column.id}>
+                        <Skeleton className="h-6 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={visibleColumns.length} className="h-48">
+                    <div className="flex flex-col items-center justify-center gap-3 text-destructive">
+                      <SearchX className="h-12 w-12 opacity-50" />
+                      <div className="text-center">
+                        <p className="font-semibold">載入失敗</p>
+                        <p className="text-sm text-muted-foreground">{error}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : data && data.data.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={visibleColumns.length} className="h-48">
+                    <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                      <Inbox className="h-16 w-16 opacity-30" />
+                      <div className="text-center">
+                        <p className="font-semibold text-lg">沒有符合條件的資料</p>
+                        <p className="text-sm">
+                          {Object.keys(filters).length > 0 
+                            ? '嘗試調整篩選條件，或新增您的第一筆交易紀錄'
+                            : '開始記錄您的交易，建立專業的交易日誌'}
+                        </p>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                data?.data.map((row) => (
+                  <TableRow key={row.id}>
+                    {visibleColumns.map((column) => (
+                      <TableCell key={column.id}>
+                        {column.format
+                          ? column.format((row as any)[column.field], row)
+                          : String((row as any)[column.field] ?? '-')}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* 分頁控制 */}
+        {data && (
+          <div className="flex items-center justify-between px-4 py-4 border-t">
+            <div className="text-sm text-muted-foreground">
+              顯示第 {(data.meta.currentPage - 1) * data.meta.pageSize + 1} -{' '}
+              {Math.min(data.meta.currentPage * data.meta.pageSize, data.meta.totalRecords)} 筆，
+              共 {data.meta.totalRecords} 筆
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(1)}
+                disabled={!data.meta.hasPreviousPage}
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => p - 1)}
+                disabled={!data.meta.hasPreviousPage}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+
+              <span className="text-sm">
+                第 {data.meta.currentPage} / {data.meta.totalPages} 頁
+              </span>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!data.meta.hasNextPage}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(data.meta.totalPages)}
+                disabled={!data.meta.hasNextPage}
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}

@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// 選項管理 Models
+// ==========================================
+
+model Commodity {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayOrder Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trades Trade[]
+
+  @@map("commodities")
+}
+
+model Timeframe {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayOrder Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trades Trade[]
+
+  @@map("timeframes")
+}
+
+model EntryType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayOrder Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tradeEntryTypes TradeEntryType[]
+
+  @@map("entry_types")
+}
+
+model TrendlineType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayOrder Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trades Trade[]
+
+  @@map("trendline_types")
+}
+
+model TradeType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayOrder Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trades Trade[]
+
+  @@map("trade_types")
+}
+
+// ==========================================
+// 交易紀錄 Model
+// ==========================================
+
+model Trade {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  tradeDate     DateTime @map("trade_date")     // 交易日（圖表日期）
+  orderDate     DateTime @map("order_date")     // 下單日（實際下單時間）
+  tradeTypeId   String?  @map("trade_type_id")  // 交易類型（實盤、回測等）
+
+  // 基本資訊
+  commodityId     String?  @map("commodity_id")
+  timeframeId     String?  @map("timeframe_id")
+  trendlineTypeId String?  @map("trendline_type_id")
+
+  // RR 計算欄位
+  stopLossTicks   Int      @map("stop_loss_ticks")
+  targetRRatio    String   @map("target_rr_ratio") // 格式: "1:3"
+  targetTicks     Int      @map("target_ticks") // 自動計算
+  actualExitTicks Int      @map("actual_exit_ticks")
+  actualRMultiple Decimal  @map("actual_r_multiple") @db.Decimal(10, 2)
+
+  // 交易結果
+  profitLoss Decimal @map("profit_loss") @db.Decimal(10, 2)
+  winLoss    String  @map("win_loss") // 'win' | 'loss' | 'breakeven'
+
+  // 交易備註與截圖
+  notes          String?
+  screenshotUrls Json?   @map("screenshot_urls") // CloudinaryImage[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  commodity     Commodity?     @relation(fields: [commodityId], references: [id], onDelete: SetNull)
+  timeframe     Timeframe?     @relation(fields: [timeframeId], references: [id], onDelete: SetNull)
+  trendlineType TrendlineType? @relation(fields: [trendlineTypeId], references: [id], onDelete: SetNull)
+  tradeType     TradeType?     @relation(fields: [tradeTypeId], references: [id], onDelete: SetNull)
+
+  // 多對多關聯
+  tradeEntryTypes   TradeEntryType[]
+
+  @@index([userId])
+  @@index([tradeDate])
+  @@index([orderDate])
+  @@index([commodityId])
+  @@index([timeframeId])
+  @@index([trendlineTypeId])
+  @@index([tradeTypeId])
+  @@index([winLoss])
+  @@map("trades")
+}
+
+// ==========================================
+// 多對多關聯表
+// ==========================================
+
+model TradeEntryType {
+  id          String @id @default(uuid())
+  tradeId     String @map("trade_id")
+  entryTypeId String @map("entry_type_id")
+
+  trade     Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  entryType EntryType @relation(fields: [entryTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, entryTypeId])
+  @@index([tradeId])
+  @@index([entryTypeId])
+  @@map("trade_entry_types")
+}
+
+// ==========================================
+// 使用者設定 Model
+// ==========================================
+
+model UserPreference {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+
+  // 設定類型
+  type      String   // 'datatable_columns', 'datatable_filters', etc.
+
+  // 設定內容（JSON）
+  settings  Json
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@map("user_preferences")
+}

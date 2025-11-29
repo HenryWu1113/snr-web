@@ -95,11 +95,10 @@ model Trade {
   trendlineTypeId String?  @map("trendline_type_id")
 
   // RR 計算欄位
-  stopLossTicks   Int      @map("stop_loss_ticks")
-  targetRRatio    String   @map("target_rr_ratio") // 格式: "1:3"
-  targetTicks     Int      @map("target_ticks") // 自動計算
-  actualExitTicks Int      @map("actual_exit_ticks")
-  actualRMultiple Decimal  @map("actual_r_multiple") @db.Decimal(10, 2)
+  stopLossTicks Int     @map("stop_loss_ticks")    // 停損點數
+  targetR       Decimal @map("target_r") @db.Decimal(10, 2) // 目標獲勝R (賠R固定為1)
+  actualExitR   Decimal @map("actual_exit_r") @db.Decimal(10, 2) // 實際出場R (範圍: -1 到 targetR)
+  leverage      Decimal @map("leverage") @db.Decimal(10, 2) // 槓桿倍數
 
   // 交易結果
   profitLoss Decimal @map("profit_loss") @db.Decimal(10, 2)

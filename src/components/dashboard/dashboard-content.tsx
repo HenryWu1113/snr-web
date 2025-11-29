@@ -110,7 +110,7 @@ export function DashboardContent({ trades, userName }: DashboardContentProps) {
       {/* 績效圖表 */}
       {filteredTrades.length > 0 ? (
         <div className="mb-8">
-          <PerformanceCharts trades={filteredTrades} />
+          <PerformanceCharts trades={filteredTrades} dateRange={dateRange} />
         </div>
       ) : (
         /* 提示區塊 */

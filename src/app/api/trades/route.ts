@@ -8,8 +8,6 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import {
   tradeApiSchema,
-  calculateTargetTicks,
-  calculateActualRMultiple,
   determineWinLoss,
 } from '@/lib/validations/trade'
 
@@ -31,15 +29,7 @@ export async function POST(request: NextRequest) {
     const validatedData = tradeApiSchema.parse(body)
 
     // 計算衍生欄位
-    const targetTicks = calculateTargetTicks(
-      validatedData.stopLossTicks,
-      validatedData.targetRRatio
-    )
-    const actualRMultiple = calculateActualRMultiple(
-      validatedData.actualExitTicks,
-      validatedData.stopLossTicks
-    )
-    const winLoss = determineWinLoss(actualRMultiple)
+    const winLoss = determineWinLoss(validatedData.actualExitR)
 
     // 建立交易紀錄
     const trade = await prisma.trade.create({
@@ -52,10 +42,9 @@ export async function POST(request: NextRequest) {
         timeframeId: validatedData.timeframeId,
         trendlineTypeId: validatedData.trendlineTypeId || null,
         stopLossTicks: validatedData.stopLossTicks,
-        targetRRatio: validatedData.targetRRatio,
-        targetTicks,
-        actualExitTicks: validatedData.actualExitTicks,
-        actualRMultiple,
+        targetR: validatedData.targetR,
+        actualExitR: validatedData.actualExitR,
+        leverage: validatedData.leverage,
         profitLoss: validatedData.profitLoss,
         winLoss,
         notes: validatedData.notes || null,

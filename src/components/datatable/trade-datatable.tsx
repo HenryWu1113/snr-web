@@ -17,18 +17,28 @@ import {
 } from '@/components/ui/table'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Inbox, SearchX } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Inbox, SearchX, Pencil, Trash2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type {
   TradeDataTableRequest,
   TradeDataTableResponse,
   MultiSortConfig,
   TradeFilters,
   ColumnVisibility,
+  TradeWithRelations,
 } from '@/types/datatable'
 import { TRADE_COLUMNS, DEFAULT_VISIBLE_COLUMNS, DEFAULT_SORT } from '@/config/trade-columns'
 import { DataTableToolbar } from './datatable-toolbar'
 import { DataTableColumnHeader } from './datatable-column-header'
+import { TradeModal } from '@/components/forms/trade-modal'
+import { DeleteConfirmDialog } from '@/components/dialogs/delete-confirm-dialog'
 
 export function TradeDataTable() {
   const router = useRouter()
@@ -42,12 +52,17 @@ export function TradeDataTable() {
 
   // DataTable 參數
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(10)
   const [sort, setSort] = useState<MultiSortConfig>(DEFAULT_SORT)
   const [filters, setFilters] = useState<TradeFilters>({})
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(
     DEFAULT_VISIBLE_COLUMNS.reduce((acc, id) => ({ ...acc, [id]: true }), {})
   )
+
+  // 編輯和刪除相關狀態
+  const [editingTrade, setEditingTrade] = useState<TradeWithRelations | null>(null)
+  const [deletingTradeId, setDeletingTradeId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // 從資料庫載入使用者設定
   useEffect(() => {
@@ -192,6 +207,42 @@ export function TradeDataTable() {
     saveFilters(newFilters)
   }
 
+  // 處理編輯
+  const handleEdit = (trade: TradeWithRelations) => {
+    setEditingTrade(trade)
+  }
+
+  // 處理刪除
+  const handleDelete = async () => {
+    if (!deletingTradeId) return
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/trades/${deletingTradeId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete trade')
+      }
+
+      // 刪除成功，重新載入資料
+      await fetchData()
+      setDeletingTradeId(null)
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('刪除失敗')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // 處理頁面大小變更
+  const handlePageSizeChange = (newPageSize: string) => {
+    setPageSize(Number(newPageSize))
+    setPage(1) // 重置到第一頁
+  }
+
   // 可見欄位
   const visibleColumns = TRADE_COLUMNS.filter((col) => columnVisibility[col.id])
 
@@ -208,7 +259,7 @@ export function TradeDataTable() {
       />
 
       {/* 表格 */}
-      <Card className="py-0">
+      <Card>
         <div className="relative w-full overflow-auto">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
@@ -222,6 +273,7 @@ export function TradeDataTable() {
                     />
                   </TableHead>
                 ))}
+                <TableHead style={{ width: 100 }}>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -234,11 +286,14 @@ export function TradeDataTable() {
                         <Skeleton className="h-6 w-full" />
                       </TableCell>
                     ))}
+                    <TableCell>
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={visibleColumns.length} className="h-48">
+                  <TableCell colSpan={visibleColumns.length + 1} className="h-48">
                     <div className="flex flex-col items-center justify-center gap-3 text-destructive">
                       <SearchX className="h-12 w-12 opacity-50" />
                       <div className="text-center">
@@ -250,7 +305,7 @@ export function TradeDataTable() {
                 </TableRow>
               ) : data && data.data.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={visibleColumns.length} className="h-48">
+                  <TableCell colSpan={visibleColumns.length + 1} className="h-48">
                     <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
                       <Inbox className="h-16 w-16 opacity-30" />
                       <div className="text-center">
@@ -274,6 +329,26 @@ export function TradeDataTable() {
                           : String((row as any)[column.field] ?? '-')}
                       </TableCell>
                     ))}
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(row)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeletingTradeId(row.id)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -284,10 +359,27 @@ export function TradeDataTable() {
         {/* 分頁控制 */}
         {data && (
           <div className="flex items-center justify-between px-4 py-4 border-t">
-            <div className="text-sm text-muted-foreground">
-              顯示第 {(data.meta.currentPage - 1) * data.meta.pageSize + 1} -{' '}
-              {Math.min(data.meta.currentPage * data.meta.pageSize, data.meta.totalRecords)} 筆，
-              共 {data.meta.totalRecords} 筆
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-muted-foreground">
+                顯示第 {(data.meta.currentPage - 1) * data.meta.pageSize + 1} -{' '}
+                {Math.min(data.meta.currentPage * data.meta.pageSize, data.meta.totalRecords)} 筆，
+                共 {data.meta.totalRecords} 筆
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">每頁顯示</span>
+                <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                  <SelectTrigger className="w-[70px] h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="15">15</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-muted-foreground">筆</span>
+              </div>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -332,6 +424,27 @@ export function TradeDataTable() {
           </div>
         )}
       </Card>
+
+      {/* 編輯對話框 */}
+      <TradeModal
+        open={!!editingTrade}
+        onOpenChange={(open) => !open && setEditingTrade(null)}
+        onSuccess={() => {
+          fetchData()
+          setEditingTrade(null)
+        }}
+        trade={editingTrade}
+      />
+
+      {/* 刪除確認對話框 */}
+      <DeleteConfirmDialog
+        open={!!deletingTradeId}
+        onOpenChange={(open) => !open && setDeletingTradeId(null)}
+        onConfirm={handleDelete}
+        isDeleting={isDeleting}
+        title="確定要刪除這筆交易紀錄嗎？"
+        description="刪除後將無法復原，所有相關的交易數據都會被永久刪除。"
+      />
     </div>
   )
 }

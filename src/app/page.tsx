@@ -28,13 +28,17 @@ export default async function Home() {
     }
   })
 
-  // 序列化交易資料（轉換 Date 為字串）
+  // 序列化交易資料（轉換 Date 為字串，Decimal 為數字）
   const serializedTrades = trades.map((trade) => ({
     ...trade,
     tradeDate: trade.tradeDate.toISOString(),
     orderDate: trade.orderDate.toISOString(),
     createdAt: trade.createdAt.toISOString(),
-    updatedAt: trade.updatedAt.toISOString()
+    updatedAt: trade.updatedAt.toISOString(),
+    targetR: Number(trade.targetR),
+    actualExitR: Number(trade.actualExitR),
+    leverage: Number(trade.leverage),
+    profitLoss: Number(trade.profitLoss),
   }))
 
   return (

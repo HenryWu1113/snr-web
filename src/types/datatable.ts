@@ -158,9 +158,9 @@ export interface TradeFilters {
   // 勝敗篩選
   winLoss?: 'win' | 'loss' | 'breakeven' | 'all'
 
-  // R 倍數區間
-  actualRMultipleMin?: number
-  actualRMultipleMax?: number
+  // 實際出場 R 區間
+  actualExitRMin?: number
+  actualExitRMax?: number
 
   // 關鍵字搜尋（搜尋 notes 欄位）
   keyword?: string
@@ -215,10 +215,9 @@ export interface TradeWithRelations {
 
   // 交易數據
   stopLossTicks: number
-  targetRRatio: string
-  targetTicks: number
-  actualExitTicks: number
-  actualRMultiple: number
+  targetR: number
+  actualExitR: number
+  leverage: number
   profitLoss: number
   winLoss: 'win' | 'loss' | 'breakeven'
 

@@ -70,11 +70,15 @@ function SortableTableRow({
   onEdit,
   onDelete,
   onToggleActive,
+  isUpdating,
+  isSortingInProgress,
 }: {
   item: OptionItem
   onEdit: (item: OptionItem) => void
   onDelete: (item: OptionItem) => void
   onToggleActive: (item: OptionItem) => void
+  isUpdating: boolean
+  isSortingInProgress: boolean
 }) {
   const {
     attributes,
@@ -107,6 +111,7 @@ function SortableTableRow({
         <Switch
           checked={item.isActive}
           onCheckedChange={() => onToggleActive(item)}
+          disabled={isUpdating || isSortingInProgress}
         />
       </TableCell>
       <TableCell className="text-sm text-muted-foreground">
@@ -118,6 +123,7 @@ function SortableTableRow({
           size="icon"
           onClick={() => onEdit(item)}
           className="mr-2"
+          disabled={isUpdating || isSortingInProgress}
         >
           <Pencil className="h-4 w-4" />
         </Button>
@@ -125,6 +131,7 @@ function SortableTableRow({
           variant="ghost"
           size="icon"
           onClick={() => onDelete(item)}
+          disabled={isUpdating || isSortingInProgress}
         >
           <Trash2 className="h-4 w-4" />
         </Button>
@@ -141,6 +148,10 @@ export function OptionCrudTemplate({
 }: OptionCrudTemplateProps) {
   const [items, setItems] = useState<OptionItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [sortingInProgress, setSortingInProgress] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<OptionItem | null>(null)
@@ -194,6 +205,7 @@ export function OptionCrudTemplate({
 
     // 更新本地狀態（樂觀更新）
     setItems(newItems)
+    setSortingInProgress(true)
 
     // 批量更新 displayOrder（一次 API 請求）
     try {
@@ -225,6 +237,8 @@ export function OptionCrudTemplate({
       })
       // 失敗時重新載入資料
       loadItems()
+    } finally {
+      setSortingInProgress(false)
     }
   }
 
@@ -246,6 +260,7 @@ export function OptionCrudTemplate({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    setSubmitting(true)
     try {
       const url = editingItem ? `${apiEndpoint}/${editingItem.id}` : apiEndpoint
       const method = editingItem ? 'PUT' : 'POST'
@@ -271,6 +286,8 @@ export function OptionCrudTemplate({
         description: error instanceof Error ? error.message : '未知錯誤',
         variant: 'destructive',
       })
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -278,6 +295,7 @@ export function OptionCrudTemplate({
   const handleDelete = async () => {
     if (!deletingItem) return
 
+    setDeleting(true)
     try {
       const response = await fetch(`${apiEndpoint}/${deletingItem.id}`, {
         method: 'DELETE',
@@ -299,11 +317,14 @@ export function OptionCrudTemplate({
         description: error instanceof Error ? error.message : '未知錯誤',
         variant: 'destructive',
       })
+    } finally {
+      setDeleting(false)
     }
   }
 
   // 切換啟用狀態
   const handleToggleActive = async (item: OptionItem) => {
+    setUpdatingId(item.id)
     try {
       const response = await fetch(`${apiEndpoint}/${item.id}`, {
         method: 'PUT',
@@ -325,6 +346,8 @@ export function OptionCrudTemplate({
         description: error instanceof Error ? error.message : '未知錯誤',
         variant: 'destructive',
       })
+    } finally {
+      setUpdatingId(null)
     }
   }
 
@@ -338,11 +361,19 @@ export function OptionCrudTemplate({
             💡 提示：拖曳項目可以調整順序，此順序會影響表單和表格中的顯示順序
           </p>
         </div>
-        <Button onClick={handleAdd}>
+        <Button onClick={handleAdd} disabled={sortingInProgress}>
           <Plus className="mr-2 h-4 w-4" />
           新增{singularName}
         </Button>
       </div>
+
+      {sortingInProgress && (
+        <div className="mb-4 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-3">
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            正在更新排序...
+          </p>
+        </div>
+      )}
 
       {loading ? (
         <div className="rounded-md border">
@@ -427,6 +458,8 @@ export function OptionCrudTemplate({
                           setDeleteDialogOpen(true)
                         }}
                         onToggleActive={handleToggleActive}
+                        isUpdating={updatingId === item.id}
+                        isSortingInProgress={sortingInProgress}
                       />
                     ))}
                   </SortableContext>
@@ -438,8 +471,8 @@ export function OptionCrudTemplate({
       )}
 
       {/* 新增/編輯對話框 */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+      <Dialog open={dialogOpen} onOpenChange={(open) => !submitting && setDialogOpen(open)}>
+        <DialogContent onInteractOutside={(e) => submitting && e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>{editingItem ? '編輯' : '新增'}{singularName}</DialogTitle>
             <DialogDescription>
@@ -455,6 +488,7 @@ export function OptionCrudTemplate({
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                  disabled={submitting}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -465,22 +499,30 @@ export function OptionCrudTemplate({
                   onCheckedChange={(checked) =>
                     setFormData({ ...formData, isActive: checked })
                   }
+                  disabled={submitting}
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+                disabled={submitting}
+              >
                 取消
               </Button>
-              <Button type="submit">{editingItem ? '更新' : '新增'}</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? '處理中...' : (editingItem ? '更新' : '新增')}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       {/* 刪除確認對話框 */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => !deleting && setDeleteDialogOpen(open)}>
+        <DialogContent onInteractOutside={(e) => deleting && e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>確認刪除</DialogTitle>
             <DialogDescription>
@@ -495,11 +537,17 @@ export function OptionCrudTemplate({
                 setDeleteDialogOpen(false)
                 setDeletingItem(null)
               }}
+              disabled={deleting}
             >
               取消
             </Button>
-            <Button type="button" variant="destructive" onClick={handleDelete}>
-              確認刪除
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? '刪除中...' : '確認刪除'}
             </Button>
           </DialogFooter>
         </DialogContent>

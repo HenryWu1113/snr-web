@@ -43,7 +43,7 @@ export function calculateStats(trades: Trade[]): TradeStats {
     0
   )
   const totalRMultiple = trades.reduce(
-    (sum, t) => sum + Number(t.actualRMultiple),
+    (sum, t) => sum + Number(t.actualExitR),
     0
   )
 
@@ -66,7 +66,7 @@ export function calculateStats(trades: Trade[]): TradeStats {
   })
 
   // 找出最佳/最差交易 (依 R 倍數)
-  const rMultiples = trades.map((t) => Number(t.actualRMultiple))
+  const rMultiples = trades.map((t) => Number(t.actualExitR))
   const bestTrade = Math.max(...rMultiples)
   const worstTrade = Math.min(...rMultiples)
 
@@ -117,7 +117,7 @@ export function groupTradesByDate(
     const data = grouped.get(date)!
     data.trades.push(trade)
     data.totalProfitLoss += Number(trade.profitLoss)
-    data.totalRMultiple += Number(trade.actualRMultiple)
+    data.totalRMultiple += Number(trade.actualExitR)
     data.tradeCount++
   })
 

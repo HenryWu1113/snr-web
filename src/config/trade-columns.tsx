@@ -97,24 +97,25 @@ export const TRADE_COLUMNS: ColumnDef<TradeWithRelations>[] = [
     width: 100,
   },
   {
-    id: 'targetRRatio',
-    field: 'targetRRatio',
-    header: '目標 RR',
-    sortable: false,
-    filterable: false,
-    type: 'string',
-    visible: true,
-    width: 100,
-  },
-  {
-    id: 'actualRMultiple',
-    field: 'actualRMultiple',
-    header: '實際 R',
+    id: 'targetR',
+    field: 'targetR',
+    header: '目標 R',
     sortable: true,
     filterable: false,
     type: 'number',
     visible: true,
     width: 100,
+    format: (value: number) => value.toFixed(2) + 'R',
+  },
+  {
+    id: 'actualExitR',
+    field: 'actualExitR',
+    header: '實際出場 R',
+    sortable: true,
+    filterable: false,
+    type: 'number',
+    visible: true,
+    width: 120,
     format: (value: number) => {
       const formatted = value.toFixed(2) + 'R'
       if (value > 0) {
@@ -124,6 +125,17 @@ export const TRADE_COLUMNS: ColumnDef<TradeWithRelations>[] = [
       }
       return <span className="text-muted-foreground">{formatted}</span>
     },
+  },
+  {
+    id: 'leverage',
+    field: 'leverage',
+    header: '槓桿倍數',
+    sortable: true,
+    filterable: false,
+    type: 'number',
+    visible: true,
+    width: 100,
+    format: (value: number) => value.toFixed(0) + 'x',
   },
   {
     id: 'profitLoss',
@@ -175,26 +187,6 @@ export const TRADE_COLUMNS: ColumnDef<TradeWithRelations>[] = [
         </span>
       )
     },
-  },
-  {
-    id: 'actualExitTicks',
-    field: 'actualExitTicks',
-    header: '出場 Ticks',
-    sortable: true,
-    filterable: false,
-    type: 'number',
-    visible: false,
-    width: 100,
-  },
-  {
-    id: 'targetTicks',
-    field: 'targetTicks',
-    header: '目標 Ticks',
-    sortable: false,
-    filterable: false,
-    type: 'number',
-    visible: false,
-    width: 100,
   },
   {
     id: 'notes',

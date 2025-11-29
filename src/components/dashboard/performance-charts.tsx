@@ -40,29 +40,31 @@ import { cn } from '@/lib/utils'
 
 interface PerformanceChartsProps {
   trades: Trade[]
+  dateRange: { from: Date; to: Date }
 }
 
-export function PerformanceCharts({ trades }: PerformanceChartsProps) {
+export function PerformanceCharts({ trades, dateRange }: PerformanceChartsProps) {
   if (trades.length === 0) {
     return null
   }
 
-  // 1. 計算最近 30 天的累積績效
-  const getLast30DaysData = () => {
-    const today = new Date()
-    const startDate = subDays(today, 29)
-    const days = eachDayOfInterval({ start: startDate, end: today })
+  // 1. 計算選定區間的累積績效
+  const getPerformanceTrendData = () => {
+    const days = eachDayOfInterval({ start: dateRange.from, end: dateRange.to })
 
     let cumulativeR = 0
 
     return days.map((day) => {
       const dayStr = format(day, 'yyyy-MM-dd')
+      // 這裡假設 trades 已經被篩選過，但為了累積計算正確，
+      // 如果 trades 只有選定區間的資料，那初始 cumulativeR 應該是 0。
+      // 如果想要顯示"這段期間的變化"，從 0 開始是合理的。
       const dayTrades = trades.filter(
-        (t) => format(new Date(t.tradeDate), 'yyyy-MM-dd') <= dayStr
+        (t) => format(new Date(t.tradeDate), 'yyyy-MM-dd') === dayStr
       )
 
-      cumulativeR = dayTrades.reduce(
-        (sum, t) => sum + Number(t.actualRMultiple),
+      cumulativeR += dayTrades.reduce(
+        (sum, t) => sum + Number(t.actualExitR),
         0
       )
 
@@ -80,41 +82,13 @@ export function PerformanceCharts({ trades }: PerformanceChartsProps) {
     const breakevens = trades.filter((t) => t.winLoss === 'breakeven').length
 
     return [
-      { name: '獲利', value: wins, fill: 'hsl(142.1 76.2% 36.3%)' },
-      { name: '虧損', value: losses, fill: 'hsl(0 84.2% 60.2%)' },
+      { name: '成功', value: wins, fill: 'hsl(142.1 76.2% 36.3%)' },
+      { name: '失敗', value: losses, fill: 'hsl(0 84.2% 60.2%)' },
       { name: '平手', value: breakevens, fill: 'hsl(215.4 16.3% 46.9%)' }
     ].filter((item) => item.value > 0)
   }
 
-  // 3. 計算 Long/Short 表現
-  const getTradeTypeData = () => {
-    const longTrades = trades.filter((t) => t.tradeTypeId?.includes('long'))
-    const shortTrades = trades.filter((t) => t.tradeTypeId?.includes('short'))
-
-    const longR = longTrades.reduce(
-      (sum, t) => sum + Number(t.actualRMultiple),
-      0
-    )
-    const shortR = shortTrades.reduce(
-      (sum, t) => sum + Number(t.actualRMultiple),
-      0
-    )
-
-    return [
-      {
-        type: 'Long',
-        累積R: parseFloat(longR.toFixed(2)),
-        fill: 'var(--color-long)'
-      },
-      {
-        type: 'Short',
-        累積R: parseFloat(shortR.toFixed(2)),
-        fill: 'var(--color-short)'
-      }
-    ].filter((item) => longTrades.length > 0 || shortTrades.length > 0)
-  }
-
-  // 4. 最佳/最差商品
+  // 3. 最佳商品 (Top Assets)
   const getTopCommodities = () => {
     const commodityStats = new Map<
       string,
@@ -130,7 +104,7 @@ export function PerformanceCharts({ trades }: PerformanceChartsProps) {
       }
       commodityStats.set(t.commodityId, {
         count: existing.count + 1,
-        totalR: existing.totalR + Number(t.actualRMultiple),
+        totalR: existing.totalR + Number(t.actualExitR),
         totalAmount: existing.totalAmount + Number(t.profitLoss)
       })
     })
@@ -144,19 +118,15 @@ export function PerformanceCharts({ trades }: PerformanceChartsProps) {
       }))
       .sort((a, b) => b.totalR - a.totalR)
 
-    return {
-      top: sorted.slice(0, 3),
-      bottom: sorted.slice(-3).reverse()
-    }
+    return sorted.slice(0, 5) // 取前 5 名
   }
 
-  const last30DaysData = getLast30DaysData()
+  const trendData = getPerformanceTrendData()
   const winLossData = getWinLossData()
-  const tradeTypeData = getTradeTypeData()
-  const { top: topCommodities, bottom: bottomCommodities } = getTopCommodities()
+  const topCommodities = getTopCommodities()
 
   // 計算整體趨勢
-  const totalR = trades.reduce((sum, t) => sum + Number(t.actualRMultiple), 0)
+  const totalR = trades.reduce((sum, t) => sum + Number(t.actualExitR), 0)
   const isPositive = totalR > 0
 
   // Chart 配置
@@ -167,24 +137,15 @@ export function PerformanceCharts({ trades }: PerformanceChartsProps) {
     }
   } satisfies ChartConfig
 
-  const tradeTypeChartConfig = {
-    long: {
-      label: 'Long',
-      color: 'hsl(221.2 83.2% 53.3%)'
-    },
-    short: {
-      label: 'Short',
-      color: 'hsl(24.6 95% 53.1%)'
-    }
-  } satisfies ChartConfig
-
   return (
     <div className='space-y-6'>
       {/* 績效趨勢圖 */}
       <Card>
         <CardHeader>
           <div className='flex items-center justify-between'>
-            <CardTitle>最近 30 天績效趨勢</CardTitle>
+            <CardTitle>
+              績效趨勢 ({format(dateRange.from, 'yyyy/MM/dd')} - {format(dateRange.to, 'yyyy/MM/dd')})
+            </CardTitle>
             <div className='flex items-center gap-2'>
               {isPositive ? (
                 <TrendingUp className='h-5 w-5 text-green-500' />
@@ -211,7 +172,7 @@ export function PerformanceCharts({ trades }: PerformanceChartsProps) {
         </CardHeader>
         <CardContent>
           <ChartContainer config={areaChartConfig} className='h-[250px] w-full'>
-            <AreaChart data={last30DaysData}>
+            <AreaChart data={trendData}>
               <defs>
                 <linearGradient id='colorR' x1='0' y1='0' x2='0' y2='1'>
                   <stop
@@ -247,158 +208,6 @@ export function PerformanceCharts({ trades }: PerformanceChartsProps) {
           </ChartContainer>
         </CardContent>
       </Card>
-
-      {/* 勝率分析與交易類型 */}
-      <div className='grid gap-6 md:grid-cols-2'>
-        {/* 勝敗分布 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>勝敗分布</CardTitle>
-          </CardHeader>
-          <CardContent className='flex items-center justify-center'>
-            <div className='h-[200px] w-full'>
-              <ResponsiveContainer width='100%' height='100%'>
-                <PieChart>
-                  <Pie
-                    data={winLossData}
-                    cx='50%'
-                    cy='50%'
-                    labelLine={false}
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
-                    }
-                    outerRadius={80}
-                    dataKey='value'
-                  >
-                    {winLossData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Long/Short 表現 */}
-        {tradeTypeData.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>交易類型表現</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer
-                config={tradeTypeChartConfig}
-                className='h-[200px] w-full'
-              >
-                <BarChart data={tradeTypeData}>
-                  <CartesianGrid strokeDasharray='3 3' vertical={false} />
-                  <XAxis
-                    dataKey='type'
-                    tickLine={false}
-                    tickMargin={10}
-                    axisLine={false}
-                  />
-                  <YAxis tickLine={false} axisLine={false} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey='累積R' radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* 商品表現排行 */}
-      {topCommodities.length > 0 && (
-        <div className='grid gap-6 md:grid-cols-2'>
-          {/* 表現最佳 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className='flex items-center gap-2'>
-                <Award className='h-5 w-5 text-yellow-500' />
-                表現最佳商品
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className='space-y-3'>
-                {topCommodities.map((item, index) => (
-                  <div
-                    key={item.name}
-                    className='flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors'
-                  >
-                    <div className='flex items-center gap-3'>
-                      <div className='flex items-center justify-center w-8 h-8 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 font-bold text-sm'>
-                        {index + 1}
-                      </div>
-                      <div>
-                        <div className='font-medium'>{item.name}</div>
-                        <div className='text-xs text-muted-foreground'>
-                          {item.count} 筆交易
-                        </div>
-                      </div>
-                    </div>
-                    <div className='text-right'>
-                      <div className='font-semibold text-green-500'>
-                        {item.totalR > 0 ? '+' : ''}
-                        {item.totalR}R
-                      </div>
-                      <div className='text-xs text-muted-foreground'>
-                        ${item.totalAmount > 0 ? '+' : ''}
-                        {item.totalAmount}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 需要改進 */}
-          {bottomCommodities.length > 0 && bottomCommodities[0].totalR < 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className='flex items-center gap-2'>
-                  <AlertCircle className='h-5 w-5 text-orange-500' />
-                  需要改進商品
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className='space-y-3'>
-                  {bottomCommodities.map((item, index) => (
-                    <div
-                      key={item.name}
-                      className='flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors'
-                    >
-                      <div className='flex items-center gap-3'>
-                        <div className='flex items-center justify-center w-8 h-8 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-500 font-bold text-sm'>
-                          {index + 1}
-                        </div>
-                        <div>
-                          <div className='font-medium'>{item.name}</div>
-                          <div className='text-xs text-muted-foreground'>
-                            {item.count} 筆交易
-                          </div>
-                        </div>
-                      </div>
-                      <div className='text-right'>
-                        <div className='font-semibold text-red-500'>
-                          {item.totalR > 0 ? '+' : ''}
-                          {item.totalR}R
-                        </div>
-                        <div className='text-xs text-muted-foreground'>
-                          ${item.totalAmount > 0 ? '+' : ''}
-                          {item.totalAmount}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
     </div>
   )
 }

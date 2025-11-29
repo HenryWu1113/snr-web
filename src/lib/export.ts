@@ -49,7 +49,6 @@ export function exportToCSV<T>(data: T[], columns: ColumnDef<T>[], filename: str
 
   const csv = Papa.unparse(exportData, {
     header: true,
-    encoding: 'utf-8',
   })
 
   // 加上 BOM 以支援中文

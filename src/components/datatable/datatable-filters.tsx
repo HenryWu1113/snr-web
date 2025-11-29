@@ -78,8 +78,8 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
     setDateRange(range)
     setLocalFilters((prev) => ({
       ...prev,
-      dateFrom: range?.from ? range.from.toISOString() : undefined,
-      dateTo: range?.to ? range.to.toISOString() : undefined,
+      dateFrom: range?.from ? format(range.from, 'yyyy-MM-dd') : undefined,
+      dateTo: range?.to ? format(range.to, 'yyyy-MM-dd') : undefined,
     }))
   }
 
@@ -167,11 +167,11 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
                 type="number"
                 step="0.1"
                 placeholder="最小"
-                value={localFilters.actualRMultipleMin ?? ''}
+                value={localFilters.actualExitRMin ?? ''}
                 onChange={(e) =>
                   setLocalFilters((prev) => ({
                     ...prev,
-                    actualRMultipleMin: e.target.value ? Number(e.target.value) : undefined,
+                    actualExitRMin: e.target.value ? Number(e.target.value) : undefined,
                   }))
                 }
               />
@@ -180,11 +180,11 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
                 type="number"
                 step="0.1"
                 placeholder="最大"
-                value={localFilters.actualRMultipleMax ?? ''}
+                value={localFilters.actualExitRMax ?? ''}
                 onChange={(e) =>
                   setLocalFilters((prev) => ({
                     ...prev,
-                    actualRMultipleMax: e.target.value ? Number(e.target.value) : undefined,
+                    actualExitRMax: e.target.value ? Number(e.target.value) : undefined,
                   }))
                 }
               />

@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { TradeDataTable } from '@/components/datatable/trade-datatable'
-import { AddTradeModal } from '@/components/forms/add-trade-modal'
+import { TradeModal } from '@/components/forms/trade-modal'
 
 export function TradesPageContent() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -38,7 +38,7 @@ export function TradesPageContent() {
         <TradeDataTable key={refreshKey} />
       </div>
 
-      <AddTradeModal
+      <TradeModal
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
         onSuccess={handleSuccess}

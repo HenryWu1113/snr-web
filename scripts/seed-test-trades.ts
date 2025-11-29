@@ -17,8 +17,9 @@ async function main() {
   const commodities = await prisma.commodity.findMany()
   const timeframes = await prisma.timeframe.findMany()
   const trendlineTypes = await prisma.trendlineType.findMany()
+  const tradeTypes = await prisma.tradeType.findMany()
 
-  if (commodities.length === 0) {
+  if (commodities.length === 0 || tradeTypes.length === 0) {
     console.error('❌ 請先執行 seed-data.sql 建立選項資料')
     process.exit(1)
   }
@@ -34,29 +35,29 @@ async function main() {
     tradeDate.setDate(tradeDate.getDate() - daysAgo)
 
     // 隨機交易數據
-    const stopLossTicks = Math.floor(Math.random() * 10) + 5 // 5-15 ticks
-    const targetRatioNum = Math.floor(Math.random() * 4) + 1 // 1-4
-    const targetRRatio = `1:${targetRatioNum}`
-    const targetTicks = stopLossTicks * targetRatioNum
+    const stopLossTicks = Math.floor(Math.random() * 300) + 200 // 200-500 ticks
+    const targetR = Number((Math.random() * 4 + 1).toFixed(2)) // 1.00-5.00
 
-    // 隨機實際出場 (-1R 到 +3R)
-    const actualRMultiple = (Math.random() * 4 - 1).toFixed(2)
-    const actualExitTicks = Math.floor(
-      Number(actualRMultiple) * stopLossTicks
-    )
+    // 隨機實際出場 R (-1R 到 targetR)
+    const actualExitR = Number((Math.random() * (targetR + 1) - 1).toFixed(2))
+
+    // 隨機槓桿倍數 (5-20倍)
+    const leverage = Math.floor(Math.random() * 16) + 5
 
     // 計算損益 (假設每 tick = $12.5)
-    const profitLoss = actualExitTicks * 12.5
+    const profitLoss = Number((actualExitR * stopLossTicks * 12.5).toFixed(2))
 
     // 判定勝負
     let winLoss: 'win' | 'loss' | 'breakeven'
-    if (Number(actualRMultiple) > 0.1) winLoss = 'win'
-    else if (Number(actualRMultiple) < -0.1) winLoss = 'loss'
+    if (actualExitR > 0.1) winLoss = 'win'
+    else if (actualExitR < -0.1) winLoss = 'loss'
     else winLoss = 'breakeven'
 
     trades.push({
       userId,
       tradeDate,
+      orderDate: tradeDate,
+      tradeTypeId: tradeTypes[Math.floor(Math.random() * tradeTypes.length)].id,
       commodityId: commodities[Math.floor(Math.random() * commodities.length)]
         .id,
       timeframeId:
@@ -64,10 +65,9 @@ async function main() {
       trendlineTypeId:
         trendlineTypes[Math.floor(Math.random() * trendlineTypes.length)].id,
       stopLossTicks,
-      targetRRatio,
-      targetTicks,
-      actualExitTicks,
-      actualRMultiple: Number(actualRMultiple),
+      targetR,
+      actualExitR,
+      leverage,
       profitLoss,
       winLoss,
       notes: `測試交易 #${i + 1}`,

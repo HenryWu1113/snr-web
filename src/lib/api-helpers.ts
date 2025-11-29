@@ -30,7 +30,7 @@ export async function authenticateUser() {
  */
 export function createOptionCrudHandlers(modelName: string) {
   // @ts-ignore - Prisma 動態模型存取
-  const model = prisma[modelName as keyof typeof prisma]
+  const model = prisma[modelName as keyof typeof prisma] as any
 
   // GET - 取得所有項目
   async function handleGet(request: NextRequest) {

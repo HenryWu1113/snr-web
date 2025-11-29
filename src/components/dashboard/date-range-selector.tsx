@@ -30,7 +30,8 @@ import {
   startOfQuarter,
   endOfQuarter,
   startOfYear,
-  endOfYear
+  endOfYear,
+  endOfDay
 } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -75,8 +76,8 @@ export function DateRangeSelector({ onRangeChange }: DateRangeSelectorProps) {
         return { from: startOfYear(today), to: endOfYear(today) }
       case 'custom':
         return customRange?.from && customRange?.to
-          ? { from: customRange.from, to: customRange.to }
-          : { from: subDays(today, 29), to: today }
+          ? { from: customRange.from, to: endOfDay(customRange.to) }
+          : { from: subDays(today, 29), to: endOfDay(today) }
       default:
         return {
           from: startOfWeek(today, { weekStartsOn: 1 }),
@@ -88,17 +89,19 @@ export function DateRangeSelector({ onRangeChange }: DateRangeSelectorProps) {
   // 處理預設值變更
   const handlePresetChange = (value: DateRangePreset) => {
     setPreset(value)
-    if (value !== 'custom') {
-      const range = getDateRange(value)
-      onRangeChange(range)
+    const range = getDateRange(value)
+    // 如果切換到自訂區間且沒有完整日期，則不觸發變更（等待使用者選擇）
+    if (value === 'custom' && (!customRange?.from || !customRange?.to)) {
+      return
     }
+    onRangeChange(range)
   }
 
   // 處理自訂區間變更
   const handleCustomRangeChange = (range: DateRange | undefined) => {
     setCustomRange(range)
     if (range?.from && range?.to) {
-      onRangeChange({ from: range.from, to: range.to })
+      onRangeChange({ from: range.from, to: endOfDay(range.to) })
     }
   }
 

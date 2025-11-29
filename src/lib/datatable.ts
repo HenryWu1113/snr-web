@@ -35,10 +35,14 @@ export function buildTradeWhereClause(
 
   // 日期區間篩選（tradeDate）
   if (filters.dateFrom || filters.dateTo) {
+    const dateToEnd = filters.dateTo
+      ? new Date(new Date(filters.dateTo).setHours(23, 59, 59, 999))
+      : undefined
+
     conditions.push({
       tradeDate: {
         ...(filters.dateFrom && { gte: new Date(filters.dateFrom) }),
-        ...(filters.dateTo && { lte: new Date(filters.dateTo) }),
+        ...(dateToEnd && { lte: dateToEnd }),
       },
     })
   }
@@ -93,12 +97,12 @@ export function buildTradeWhereClause(
     })
   }
 
-  // R 倍數區間篩選
-  if (filters.actualRMultipleMin !== undefined || filters.actualRMultipleMax !== undefined) {
+  // 實際出場 R 區間篩選
+  if (filters.actualExitRMin !== undefined || filters.actualExitRMax !== undefined) {
     conditions.push({
-      actualRMultiple: {
-        ...(filters.actualRMultipleMin !== undefined && { gte: filters.actualRMultipleMin }),
-        ...(filters.actualRMultipleMax !== undefined && { lte: filters.actualRMultipleMax }),
+      actualExitR: {
+        ...(filters.actualExitRMin !== undefined && { gte: filters.actualExitRMin }),
+        ...(filters.actualExitRMax !== undefined && { lte: filters.actualExitRMax }),
       },
     })
   }
@@ -121,6 +125,26 @@ export function buildTradeWhereClause(
 }
 
 /**
+ * 驗證排序欄位是否允許
+ */
+const SORTABLE_FIELDS = [
+  'tradeDate',
+  'orderDate',
+  'createdAt',
+  'updatedAt',
+  'stopLossTicks',
+  'targetR',
+  'actualExitR',
+  'leverage',
+  'profitLoss',
+  'winLoss',
+  'commodity',
+  'timeframe',
+  'trendlineType',
+  'tradeType',
+]
+
+/**
  * 建構 Prisma orderBy 條件（從 MultiSortConfig）
  */
 export function buildTradeOrderByClause(
@@ -131,7 +155,15 @@ export function buildTradeOrderByClause(
     return [{ tradeDate: 'desc' }]
   }
 
-  return sort.map((s) => {
+  // 過濾掉不允許的排序欄位（防止舊欄位名稱造成錯誤）
+  const validSort = sort.filter((s) => SORTABLE_FIELDS.includes(s.field))
+
+  if (validSort.length === 0) {
+    // 如果過濾後沒有有效的排序欄位，使用預設排序
+    return [{ tradeDate: 'desc' }]
+  }
+
+  return validSort.map((s) => {
     // 處理關聯欄位排序
     if (s.field === 'commodity') {
       return { commodity: { name: s.direction } }
@@ -187,25 +219,6 @@ export function normalizeDataTableRequest(
     columnVisibility: request.columnVisibility || {},
   }
 }
-
-/**
- * 驗證排序欄位是否允許
- */
-const SORTABLE_FIELDS = [
-  'tradeDate',
-  'orderDate',
-  'createdAt',
-  'updatedAt',
-  'stopLossTicks',
-  'actualExitTicks',
-  'actualRMultiple',
-  'profitLoss',
-  'winLoss',
-  'commodity',
-  'timeframe',
-  'trendlineType',
-  'tradeType',
-]
 
 export function validateSortFields(sort: MultiSortConfig | undefined): boolean {
   if (!sort) return true

@@ -146,6 +146,14 @@ export function TradeModal({
           trendlineTypes: trendlineTypes.data || [],
           entryTypes: entryTypes.data || []
         })
+        
+        console.log('Options loaded:', {
+          tradeTypes: tradeTypes.data?.length,
+          commodities: commodities.data?.length,
+          timeframes: timeframes.data?.length,
+          trendlineTypes: trendlineTypes.data?.length,
+          entryTypes: entryTypes.data?.length
+        })
       } catch (error) {
         console.error('Failed to load options:', error)
       }
@@ -437,7 +445,11 @@ export function TradeModal({
                   control={control}
                   name='commodityId'
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value || undefined}
+                      key={field.value || 'empty'}
+                    >
                       <SelectTrigger className='w-full'>
                         <SelectValue placeholder='選擇商品' />
                       </SelectTrigger>
@@ -467,7 +479,11 @@ export function TradeModal({
                   control={control}
                   name='tradeTypeId'
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value || undefined}
+                      key={field.value || 'empty'}
+                    >
                       <SelectTrigger className='w-full'>
                         <SelectValue placeholder='選擇類型' />
                       </SelectTrigger>
@@ -500,7 +516,11 @@ export function TradeModal({
                   control={control}
                   name='timeframeId'
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value || undefined}
+                      key={field.value || 'empty'}
+                    >
                       <SelectTrigger className='w-full'>
                         <SelectValue placeholder='選擇時間框架' />
                       </SelectTrigger>
@@ -530,7 +550,11 @@ export function TradeModal({
                   control={control}
                   name='trendlineTypeId'
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value || undefined}
+                      key={field.value || 'empty'}
+                    >
                       <SelectTrigger className='w-full'>
                         <SelectValue placeholder='選擇趨勢線' />
                       </SelectTrigger>

@@ -23,8 +23,21 @@ export default async function Home() {
     where: {
       userId: user.id
     },
+    include: {
+      tradeType: true
+    },
     orderBy: {
       tradeDate: 'asc'
+    }
+  })
+
+  // 查詢所有交易類型（用於篩選）
+  const tradeTypes = await prisma.tradeType.findMany({
+    where: {
+      isActive: true
+    },
+    orderBy: {
+      displayOrder: 'asc'
     }
   })
 
@@ -46,6 +59,7 @@ export default async function Home() {
       <div className='container mx-auto px-4 py-8'>
         <DashboardContent
           trades={serializedTrades as any}
+          tradeTypes={tradeTypes}
           userName={user.user_metadata?.name || user.email || '使用者'}
         />
       </div>

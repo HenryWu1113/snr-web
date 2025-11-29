@@ -97,6 +97,34 @@ export function buildTradeWhereClause(
     })
   }
 
+  // 下單日區間篩選（orderDate）
+  if (filters.orderDateFrom || filters.orderDateTo) {
+    const orderDateToEnd = filters.orderDateTo
+      ? new Date(new Date(filters.orderDateTo).setHours(23, 59, 59, 999))
+      : undefined
+
+    conditions.push({
+      orderDate: {
+        ...(filters.orderDateFrom && { gte: new Date(filters.orderDateFrom) }),
+        ...(orderDateToEnd && { lte: orderDateToEnd }),
+      },
+    })
+  }
+
+  // 交易類型篩選（多選）
+  if (filters.tradeTypeIds && filters.tradeTypeIds.length > 0) {
+    conditions.push({
+      tradeTypeId: { in: filters.tradeTypeIds },
+    })
+  }
+
+  // 做多/做空篩選（多選）
+  if (filters.positions && filters.positions.length > 0) {
+    conditions.push({
+      position: { in: filters.positions },
+    })
+  }
+
   // 實際出場 R 區間篩選
   if (filters.actualExitRMin !== undefined || filters.actualExitRMax !== undefined) {
     conditions.push({

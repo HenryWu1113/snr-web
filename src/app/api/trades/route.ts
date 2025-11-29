@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
         commodityId: validatedData.commodityId,
         timeframeId: validatedData.timeframeId,
         trendlineTypeId: validatedData.trendlineTypeId || null,
+        position: validatedData.position,
         stopLossTicks: validatedData.stopLossTicks,
         targetR: validatedData.targetR,
         actualExitR: validatedData.actualExitR,

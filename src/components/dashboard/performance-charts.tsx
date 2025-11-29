@@ -25,16 +25,19 @@ import {
   PieChart,
   Cell,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  ReferenceLine,
+  Label
 } from 'recharts'
 import { Trade } from '@prisma/client'
-import { format, subDays, eachDayOfInterval } from 'date-fns'
+import { format, subDays, eachDayOfInterval, isToday } from 'date-fns'
 import {
   TrendingUp,
   TrendingDown,
   Minus,
   Award,
-  AlertCircle
+  AlertCircle,
+  MapPin
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -56,11 +59,9 @@ export function PerformanceCharts({ trades, dateRange }: PerformanceChartsProps)
 
     return days.map((day) => {
       const dayStr = format(day, 'yyyy-MM-dd')
-      // 這裡假設 trades 已經被篩選過，但為了累積計算正確，
-      // 如果 trades 只有選定區間的資料，那初始 cumulativeR 應該是 0。
-      // 如果想要顯示"這段期間的變化"，從 0 開始是合理的。
+      // 使用下單日期（orderDate）來分組交易
       const dayTrades = trades.filter(
-        (t) => format(new Date(t.tradeDate), 'yyyy-MM-dd') === dayStr
+        (t) => format(new Date(t.orderDate), 'yyyy-MM-dd') === dayStr
       )
 
       cumulativeR += dayTrades.reduce(
@@ -128,6 +129,10 @@ export function PerformanceCharts({ trades, dateRange }: PerformanceChartsProps)
   // 計算整體趨勢
   const totalR = trades.reduce((sum, t) => sum + Number(t.actualExitR), 0)
   const isPositive = totalR > 0
+
+  // 找出今天在圖表中的 X 軸位置
+  const todayDateStr = format(new Date(), 'MM/dd')
+  const todayDataPoint = trendData.find((d) => d.date === todayDateStr)
 
   // Chart 配置
   const areaChartConfig = {
@@ -197,6 +202,17 @@ export function PerformanceCharts({ trades, dateRange }: PerformanceChartsProps)
               />
               <YAxis tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
+              
+              {/* 今日標記（僅參考線） */}
+              {todayDataPoint && (
+                <ReferenceLine
+                  x={todayDateStr}
+                  stroke='hsl(217.2 91.2% 59.8%)'
+                  strokeWidth={2}
+                  strokeDasharray='5 5'
+                />
+              )}
+              
               <Area
                 type='monotone'
                 dataKey='累積R'

@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { DailyTradeData } from '@/lib/stats'
+import { DailyTradeData, groupTradesByDate } from '@/lib/stats'
 import { cn } from '@/lib/utils'
 import {
   startOfYear,
@@ -29,23 +29,31 @@ import { zhTW } from 'date-fns/locale'
 import { useState } from 'react'
 import { HelpCircle } from 'lucide-react'
 
-type DateMode = 'tradeDate' | 'createdAt'
+type DateMode = 'tradeDate' | 'orderDate'
 type ValueMode = 'r' | 'amount' | 'frequency'
 
+interface TradeTypeOption {
+  id: string
+  name: string
+}
+
 interface ActivityCalendarProps {
-  dailyData: Map<string, DailyTradeData>
+  trades: any[] // 接收完整的 trades 陣列
+  tradeTypes: TradeTypeOption[] // 接收交易類型選項
   year?: number
   onYearChange?: (year: number) => void
 }
 
 export function ActivityCalendar({
-  dailyData,
+  trades,
+  tradeTypes,
   year: initialYear = new Date().getFullYear(),
   onYearChange,
 }: ActivityCalendarProps) {
-  const [dateMode, setDateMode] = useState<DateMode>('tradeDate')
+  const [dateMode, setDateMode] = useState<DateMode>('orderDate')
   const [valueMode, setValueMode] = useState<ValueMode>('r')
   const [selectedYear, setSelectedYear] = useState(initialYear)
+  const [selectedTradeType, setSelectedTradeType] = useState<string>('all')
 
   // 處理年份變更
   const handleYearChange = (newYear: string) => {
@@ -53,6 +61,14 @@ export function ActivityCalendar({
     setSelectedYear(yearNum)
     onYearChange?.(yearNum)
   }
+
+  // 根據交易類型篩選交易
+  const filteredTrades = selectedTradeType === 'all' 
+    ? trades 
+    : trades.filter(trade => trade.tradeTypeId === selectedTradeType)
+
+  // 按日期分組
+  const dailyData = groupTradesByDate(filteredTrades, dateMode)
 
   // 生成一年的所有日期
   const yearStart = startOfYear(new Date(selectedYear, 0, 1))
@@ -279,13 +295,28 @@ export function ActivityCalendar({
             </TooltipProvider>
           </div>
           <div className="flex items-center gap-2">
-            <Select value={dateMode} onValueChange={(v) => setDateMode(v as DateMode)}>
+            {/* 交易類型篩選器 */}
+            <Select value={selectedTradeType} onValueChange={setSelectedTradeType}>
               <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="交易類型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                {tradeTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.id}>
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={dateMode} onValueChange={(v) => setDateMode(v as DateMode)}>
+              <SelectTrigger className="w-[160px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="tradeDate">交易日期</SelectItem>
-                <SelectItem value="createdAt">記錄日期</SelectItem>
+                <SelectItem value="tradeDate">交易日(圖表日期)</SelectItem>
+                <SelectItem value="orderDate">下單日</SelectItem>
               </SelectContent>
             </Select>
 

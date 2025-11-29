@@ -4,14 +4,15 @@
 
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
+import { TrendingUp, TrendingDown } from 'lucide-react'
 import type { ColumnDef } from '@/types/datatable'
 import type { TradeWithRelations } from '@/types/datatable'
 
 export const TRADE_COLUMNS: ColumnDef<TradeWithRelations>[] = [
   {
-    id: 'tradeDate',
-    field: 'tradeDate',
-    header: '交易日',
+    id: 'orderDate',
+    field: 'orderDate',
+    header: '下單日',
     sortable: true,
     filterable: true,
     type: 'date',
@@ -20,9 +21,9 @@ export const TRADE_COLUMNS: ColumnDef<TradeWithRelations>[] = [
     format: (value: Date) => format(new Date(value), 'yyyy/MM/dd', { locale: zhTW }),
   },
   {
-    id: 'orderDate',
-    field: 'orderDate',
-    header: '下單日',
+    id: 'tradeDate',
+    field: 'tradeDate',
+    header: '交易日(圖表日期)',
     sortable: true,
     filterable: true,
     type: 'date',
@@ -74,6 +75,37 @@ export const TRADE_COLUMNS: ColumnDef<TradeWithRelations>[] = [
     width: 150,
     format: (value: Array<{ name: string }>) =>
       value.map((e) => e.name).join(', ') || '-',
+  },
+  {
+    id: 'position',
+    field: 'position',
+    header: '做多/做空',
+    sortable: true,
+    filterable: true,
+    type: 'enum',
+    visible: true,
+    width: 100,
+    filterOptions: [
+      { label: '做多', value: 'LONG' },
+      { label: '做空', value: 'SHORT' },
+    ],
+    format: (value: 'LONG' | 'SHORT') => {
+      if (value === 'LONG') {
+        return (
+          <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-xs font-medium">做多</span>
+          </div>
+        )
+      } else {
+        return (
+          <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
+            <TrendingDown className="h-4 w-4" />
+            <span className="text-xs font-medium">做空</span>
+          </div>
+        )
+      }
+    },
   },
   {
     id: 'trendlineType',
@@ -220,5 +252,5 @@ export const DEFAULT_VISIBLE_COLUMNS = TRADE_COLUMNS.filter((col) => col.visible
 
 // 預設排序
 export const DEFAULT_SORT = [
-  { field: 'tradeDate', direction: 'desc' as const },
+  { field: 'orderDate', direction: 'desc' as const },
 ]

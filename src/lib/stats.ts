@@ -96,7 +96,7 @@ export interface DailyTradeData {
 
 export function groupTradesByDate(
   trades: Trade[],
-  dateField: 'tradeDate' | 'createdAt' = 'tradeDate'
+  dateField: 'tradeDate' | 'createdAt' | 'orderDate' = 'tradeDate'
 ): Map<string, DailyTradeData> {
   const grouped = new Map<string, DailyTradeData>()
 

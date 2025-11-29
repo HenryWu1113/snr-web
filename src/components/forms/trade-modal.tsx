@@ -48,6 +48,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { TradeWithRelations } from '@/types/datatable'
 import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/hooks/use-toast'
 
 interface TradeModalProps {
   open: boolean
@@ -67,6 +68,7 @@ export function TradeModal({
   onSuccess,
   trade
 }: TradeModalProps) {
+  const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [options, setOptions] = useState<{
     tradeTypes: OptionData[]
@@ -105,6 +107,7 @@ export function TradeModal({
       commodityId: trade.commodity?.id || '',
       timeframeId: trade.timeframe?.id || '',
       trendlineTypeId: trade.trendlineType?.id || '',
+      position: trade.position || 'LONG',
       entryTypeIds: trade.entryTypes.map((et) => et.id),
       stopLossTicks: trade.stopLossTicks,
       targetR: trade.targetR,
@@ -116,6 +119,7 @@ export function TradeModal({
     } : {
       tradeDate: new Date(),
       orderDate: new Date(),
+      position: 'LONG',
       entryTypeIds: [],
       screenshots: []
     }
@@ -174,6 +178,7 @@ export function TradeModal({
         commodityId: trade.commodity?.id || '',
         timeframeId: trade.timeframe?.id || '',
         trendlineTypeId: trade.trendlineType?.id || '',
+        position: trade.position || 'LONG',
         entryTypeIds: trade.entryTypes.map((et) => et.id),
         stopLossTicks: trade.stopLossTicks,
         targetR: trade.targetR,
@@ -193,6 +198,7 @@ export function TradeModal({
       reset({
         tradeDate: new Date(),
         orderDate: new Date(),
+        position: 'LONG',
         entryTypeIds: [],
         screenshots: []
       })
@@ -293,17 +299,25 @@ export function TradeModal({
         )
       }
 
-      // 成功後重置表單並關閉 modal
+      // 成功後顯示 toast 提示
+      toast({
+        title: isEditMode ? '更新成功' : '新增成功',
+        description: `交易紀錄已${isEditMode ? '更新' : '新增'}`,
+      })
+
+      // 重置表單並關閉 modal
       reset()
       onOpenChange(false)
       onSuccess?.()
     } catch (error) {
       console.error('Submit error:', error)
-      alert(
-        error instanceof Error
-          ? error.message
-          : `${isEditMode ? '更新' : '新增'}交易失敗`
-      )
+      
+      // 錯誤時顯示 toast
+      toast({
+        title: isEditMode ? '更新失敗' : '新增失敗',
+        description: error instanceof Error ? error.message : `${isEditMode ? '更新' : '新增'}交易失敗`,
+        variant: 'destructive',
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -358,7 +372,7 @@ export function TradeModal({
                   control={control}
                   name='tradeDate'
                   render={({ field }) => (
-                    <Popover>
+                    <Popover modal={true}>
                       <PopoverTrigger asChild>
                         <Button
                           variant='outline'
@@ -400,7 +414,7 @@ export function TradeModal({
                   control={control}
                   name='orderDate'
                   render={({ field }) => (
-                    <Popover>
+                    <Popover modal={true}>
                       <PopoverTrigger asChild>
                         <Button
                           variant='outline'
@@ -574,6 +588,37 @@ export function TradeModal({
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* 第四行：做多/做空 */}
+            <div className='space-y-2'>
+              <Label htmlFor='position'>
+                做多/做空<span className='text-destructive'>*</span>
+              </Label>
+              <Controller
+                control={control}
+                name='position'
+                render={({ field }) => (
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value || undefined}
+                    key={field.value || 'empty'}
+                  >
+                    <SelectTrigger className='w-full'>
+                      <SelectValue placeholder='選擇做多或做空' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='LONG'>做多 (Long)</SelectItem>
+                      <SelectItem value='SHORT'>做空 (Short)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.position && (
+                <p className='text-sm text-destructive'>
+                  {errors.position.message}
+                </p>
+              )}
             </div>
 
             {/* 進場類型（多選）*/}

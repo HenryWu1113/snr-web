@@ -157,6 +157,8 @@ export function OptionCrudTemplate({
   const [editingItem, setEditingItem] = useState<OptionItem | null>(null)
   const [deletingItem, setDeletingItem] = useState<OptionItem | null>(null)
   const [formData, setFormData] = useState({ name: '', isActive: true })
+  const [usageCount, setUsageCount] = useState<number | null>(null)
+  const [checkingUsage, setCheckingUsage] = useState(false)
   const { toast } = useToast()
 
   // 拖曳感應器設定
@@ -322,6 +324,27 @@ export function OptionCrudTemplate({
     }
   }
 
+  // 點擊刪除按鈕（觸發檢查）
+  const handleDeleteClick = async (item: OptionItem) => {
+    setDeletingItem(item)
+    setCheckingUsage(true)
+    setUsageCount(null)
+    setDeleteDialogOpen(true)
+
+    const type = apiEndpoint.split('/').pop()
+    try {
+      const res = await fetch(`/api/admin/check-usage?type=${type}&id=${item.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        setUsageCount(data.count)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setCheckingUsage(false)
+    }
+  }
+
   // 切換啟用狀態
   const handleToggleActive = async (item: OptionItem) => {
     setUpdatingId(item.id)
@@ -453,10 +476,7 @@ export function OptionCrudTemplate({
                         key={item.id}
                         item={item}
                         onEdit={handleEdit}
-                        onDelete={(item) => {
-                          setDeletingItem(item)
-                          setDeleteDialogOpen(true)
-                        }}
+                        onDelete={handleDeleteClick}
                         onToggleActive={handleToggleActive}
                         isUpdating={updatingId === item.id}
                         isSortingInProgress={sortingInProgress}
@@ -526,7 +546,19 @@ export function OptionCrudTemplate({
           <DialogHeader>
             <DialogTitle>確認刪除</DialogTitle>
             <DialogDescription>
-              確定要刪除「{deletingItem?.name}」嗎？此操作無法復原。
+              {checkingUsage ? (
+                '正在檢查引用狀況...'
+              ) : usageCount !== null && usageCount > 0 ? (
+                <span className="text-destructive font-bold block mt-2">
+                  ⚠️ 警告：此選項目前被 {usageCount} 筆交易使用中！
+                  <br />
+                  刪除後，這些交易的該欄位將變為空白。
+                  <br />
+                  確定要繼續嗎？
+                </span>
+              ) : (
+                `確定要刪除「${deletingItem?.name}」嗎？此操作無法復原。`
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -545,7 +577,7 @@ export function OptionCrudTemplate({
               type="button"
               variant="destructive"
               onClick={handleDelete}
-              disabled={deleting}
+              disabled={deleting || checkingUsage}
             >
               {deleting ? '刪除中...' : '確認刪除'}
             </Button>

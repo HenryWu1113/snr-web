@@ -19,7 +19,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { DataTableFilters } from './datatable-filters'
 import { exportToCSV, exportToExcel } from '@/lib/export'
-import type { TradeFilters, ColumnVisibility, ColumnDef, TradeWithRelations } from '@/types/datatable'
+import { toast } from 'sonner'
+import type { TradeFilters, ColumnVisibility, ColumnDef, TradeWithRelations, MultiSortConfig } from '@/types/datatable'
 
 interface DataTableToolbarProps {
   filters: TradeFilters
@@ -28,6 +29,7 @@ interface DataTableToolbarProps {
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void
   columns: ColumnDef<TradeWithRelations>[]
   data: TradeWithRelations[]
+  sort: MultiSortConfig
 }
 
 export function DataTableToolbar({
@@ -37,8 +39,10 @@ export function DataTableToolbar({
   onColumnVisibilityChange,
   columns,
   data,
+  sort,
 }: DataTableToolbarProps) {
   const [showFilters, setShowFilters] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   // 計算啟用的篩選器數量
   const activeFiltersCount = Object.entries(filters).filter(([key, value]) => {
@@ -48,12 +52,42 @@ export function DataTableToolbar({
 
   // 處理匯出
   const handleExport = async (format: 'csv' | 'excel') => {
-    const visibleCols = columns.filter((col) => columnVisibility[col.id])
+    try {
+      setIsExporting(true)
+      toast.info('正在準備匯出檔案...', { duration: 2000 })
 
-    if (format === 'csv') {
-      exportToCSV(data, visibleCols, 'trades')
-    } else {
-      exportToExcel(data, visibleCols, 'trades')
+      // 呼叫匯出 API 取得所有符合條件的資料
+      const response = await fetch('/api/trades/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filters, sort }),
+      })
+
+      if (!response.ok) {
+        throw new Error('匯出失敗')
+      }
+
+      const { data: allData } = await response.json()
+      
+      if (!allData || allData.length === 0) {
+        toast.warning('沒有可匯出的資料')
+        return
+      }
+
+      const visibleCols = columns.filter((col) => columnVisibility[col.id])
+
+      if (format === 'csv') {
+        exportToCSV(allData, visibleCols, 'trades_export')
+      } else {
+        exportToExcel(allData, visibleCols, 'trades_export')
+      }
+      
+      toast.success(`成功匯出 ${allData.length} 筆資料`)
+    } catch (error) {
+      console.error('Export failed:', error)
+      toast.error('匯出失敗，請稍後再試')
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -119,9 +153,9 @@ export function DataTableToolbar({
           {/* 匯出功能 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" disabled={isExporting}>
                 <Download className="mr-2 h-4 w-4" />
-                匯出
+                {isExporting ? '匯出中...' : '匯出'}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

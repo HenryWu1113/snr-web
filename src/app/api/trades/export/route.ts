@@ -1,8 +1,8 @@
 /**
- * DataTable API Route
- * 處理交易紀錄的 server-side 分頁、篩選、排序
+ * 交易紀錄匯出 API
+ * 匯出所有符合篩選條件的交易紀錄（不分頁）
  *
- * POST /api/trades/datatable
+ * POST /api/trades/export
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -11,13 +11,10 @@ import { prisma } from '@/lib/prisma'
 import {
   buildTradeWhereClause,
   buildTradeOrderByClause,
-  calculatePaginationMeta,
   normalizeDataTableRequest,
-  validateSortFields,
 } from '@/lib/datatable'
 import type {
   TradeDataTableRequest,
-  TradeDataTableResponse,
   TradeWithRelations,
 } from '@/types/datatable'
 
@@ -37,76 +34,58 @@ export async function POST(request: NextRequest) {
     // 2. 解析請求體
     const body: Partial<TradeDataTableRequest> = await request.json()
 
-    // 3. 規範化請求參數
+    // 3. 規範化請求參數 (主要為了 filters 和 sort)
     const normalizedRequest = normalizeDataTableRequest(body)
 
-    // 4. 驗證排序欄位
-    if (!validateSortFields(normalizedRequest.sort)) {
-      return NextResponse.json(
-        { error: 'Invalid sort fields' },
-        { status: 400 }
-      )
-    }
-
-    // 5. 建構 Prisma 查詢條件
+    // 4. 建構 Prisma 查詢條件
     const whereClause = buildTradeWhereClause(normalizedRequest.filters, user.id)
     const orderByClause = buildTradeOrderByClause(normalizedRequest.sort)
 
-    // 6. 計算分頁參數
-    const { page, pageSize } = normalizedRequest.pagination
-    const skip = (page - 1) * pageSize
-    const take = pageSize
-
-    // 7. 並行執行資料查詢與計數查詢
-    const [trades, totalCount] = await Promise.all([
-      prisma.trade.findMany({
-        where: whereClause,
-        orderBy: orderByClause,
-        skip,
-        take,
-        include: {
-          commodity: {
-            select: {
-              id: true,
-              name: true,
-            },
+    // 5. 查詢所有符合條件的資料 (不分頁)
+    // 為了效能，可以限制最大筆數，例如 5000
+    const trades = await prisma.trade.findMany({
+      where: whereClause,
+      orderBy: orderByClause,
+      take: 5000, // 安全限制
+      include: {
+        commodity: {
+          select: {
+            id: true,
+            name: true,
           },
-          timeframe: {
-            select: {
-              id: true,
-              name: true,
-            },
+        },
+        timeframe: {
+          select: {
+            id: true,
+            name: true,
           },
-          trendlineType: {
-            select: {
-              id: true,
-              name: true,
-            },
+        },
+        trendlineType: {
+          select: {
+            id: true,
+            name: true,
           },
-          tradeType: {
-            select: {
-              id: true,
-              name: true,
-            },
+        },
+        tradeType: {
+          select: {
+            id: true,
+            name: true,
           },
-          tradeEntryTypes: {
-            include: {
-              entryType: {
-                select: {
-                  id: true,
-                  name: true,
-                },
+        },
+        tradeEntryTypes: {
+          include: {
+            entryType: {
+              select: {
+                id: true,
+                name: true,
               },
             },
           },
         },
-      }),
-      prisma.trade.count({
-        where: whereClause,
-      }),
-    ])
+      },
+    })
 
-    // 8. 轉換資料格式
+    // 6. 轉換資料格式
     const transformedTrades: TradeWithRelations[] = trades.map((trade) => ({
       id: trade.id,
       userId: trade.userId,
@@ -132,18 +111,9 @@ export async function POST(request: NextRequest) {
       updatedAt: trade.updatedAt,
     }))
 
-    // 9. 計算分頁資訊
-    const paginationMeta = calculatePaginationMeta(page, pageSize, totalCount)
-
-    // 10. 建構回應
-    const response: TradeDataTableResponse = {
-      data: transformedTrades,
-      meta: paginationMeta,
-    }
-
-    return NextResponse.json(response)
+    return NextResponse.json({ data: transformedTrades })
   } catch (error) {
-    console.error('DataTable API Error:', error)
+    console.error('Export API Error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

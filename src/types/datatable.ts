@@ -136,6 +136,10 @@ export interface TradeFilters {
   dateFrom?: string  // ISO 8601 格式
   dateTo?: string
 
+  // 下單日區間
+  orderDateFrom?: string
+  orderDateTo?: string
+
   // 時間區間（chartTime）
   chartTimeFrom?: string
   chartTimeTo?: string
@@ -149,8 +153,14 @@ export interface TradeFilters {
   // 進場模式（多選）
   entryTypeIds?: string[]
 
+  // 交易類型（多選）
+  tradeTypeIds?: string[]
+
   // 趨勢線類型（多選）
   trendlineTypeIds?: string[]
+
+  // 做多/做空（多選）
+  positions?: ('LONG' | 'SHORT')[]
 
   // 盤勢判斷（多選）
   sessionTypes?: ('ASIAN' | 'LONDON' | 'AMERICAN')[]
@@ -212,6 +222,9 @@ export interface TradeWithRelations {
     id: string
     name: string
   }>
+
+  // 做多/做空
+  position: 'LONG' | 'SHORT'
 
   // 交易數據
   stopLossTicks: number

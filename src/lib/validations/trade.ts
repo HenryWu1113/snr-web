@@ -30,6 +30,9 @@ export const tradeFormSchema = z
     commodityId: z.string().min(1, '請選擇商品'),
     timeframeId: z.string().min(1, '請選擇時間框架'),
     trendlineTypeId: z.string().min(1, '請選擇趨勢線類型'),
+    position: z.enum(['LONG', 'SHORT'], {
+      message: '請選擇做多或做空'
+    }),
 
     // 多選欄位
     entryTypeIds: z.array(z.string()).min(1, '請至少選擇一個進場類型'),

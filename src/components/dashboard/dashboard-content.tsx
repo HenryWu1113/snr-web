@@ -10,16 +10,24 @@ import { ActivityCalendar } from '@/components/dashboard/activity-calendar'
 import { PerformanceCharts } from '@/components/dashboard/performance-charts'
 import { DateRangeSelector } from '@/components/dashboard/date-range-selector'
 import { TrendingUp, Target, DollarSign, BarChart3 } from 'lucide-react'
-import { Trade } from '@prisma/client'
+import { Trade, TradeType } from '@prisma/client'
 import { calculateStats, groupTradesByDate } from '@/lib/stats'
 import { startOfWeek, endOfWeek } from 'date-fns'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface DashboardContentProps {
-  trades: Trade[]
+  trades: (Trade & { tradeType: TradeType | null })[]
+  tradeTypes: TradeType[]
   userName: string
 }
 
-export function DashboardContent({ trades, userName }: DashboardContentProps) {
+export function DashboardContent({ trades, tradeTypes, userName }: DashboardContentProps) {
   // 預設本週
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date()
@@ -29,19 +37,24 @@ export function DashboardContent({ trades, userName }: DashboardContentProps) {
     }
   })
 
-  // 根據選定的時間範圍篩選交易
+  // 交易類型篩選（預設為 'all' 全部）
+  const [selectedTradeType, setSelectedTradeType] = useState<string>('all')
+
+  // 根據選定的時間範圍和交易類型篩選交易（使用下單日）
   const filteredTrades = useMemo(() => {
     return trades.filter((trade) => {
-      const tradeDate = new Date(trade.tradeDate)
-      return tradeDate >= dateRange.from && tradeDate <= dateRange.to
+      const orderDate = new Date(trade.orderDate) // 使用下單日
+      const dateMatches = orderDate >= dateRange.from && orderDate <= dateRange.to
+      
+      // 如果選擇「全部」，則不篩選交易類型
+      const tradeTypeMatches = selectedTradeType === 'all' || trade.tradeTypeId === selectedTradeType
+      
+      return dateMatches && tradeTypeMatches
     })
-  }, [trades, dateRange])
+  }, [trades, dateRange, selectedTradeType])
 
   // 計算統計數據
   const stats = useMemo(() => calculateStats(filteredTrades), [filteredTrades])
-
-  // 按日期分組（用於熱力圖，使用全部交易）
-  const dailyData = useMemo(() => groupTradesByDate(trades, 'tradeDate'), [trades])
 
   return (
     <>
@@ -50,9 +63,30 @@ export function DashboardContent({ trades, userName }: DashboardContentProps) {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">儀表板</h1>
-            <p className="text-muted-foreground mt-1">歡迎回來，{userName}</p>
+            <p className="text-muted-foreground mt-1">
+              歡迎回來，{userName}
+              <span className="text-xs ml-2 opacity-75">
+                （統計基於下單日期）
+              </span>
+            </p>
           </div>
-          <DateRangeSelector onRangeChange={setDateRange} />
+          <div className="flex gap-4">
+            {/* 交易類型篩選器 */}
+            <Select value={selectedTradeType} onValueChange={setSelectedTradeType}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="選擇交易類型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                {tradeTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.id}>
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <DateRangeSelector onRangeChange={setDateRange} />
+          </div>
         </div>
       </header>
 
@@ -123,7 +157,7 @@ export function DashboardContent({ trades, userName }: DashboardContentProps) {
       )}
 
       {/* 交易活動日曆（移到最下方） */}
-      <ActivityCalendar dailyData={dailyData} />
+      <ActivityCalendar trades={trades} tradeTypes={tradeTypes} />
     </>
   )
 }

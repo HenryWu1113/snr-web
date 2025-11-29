@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/popover'
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
-import { CalendarIcon, Search } from 'lucide-react'
+import { CalendarIcon, Search, RotateCcw } from 'lucide-react'
 import type { TradeFilters } from '@/types/datatable'
 import type { DateRange } from 'react-day-picker'
 
@@ -40,14 +40,20 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
     from: filters.dateFrom ? new Date(filters.dateFrom) : undefined,
     to: filters.dateTo ? new Date(filters.dateTo) : undefined,
   })
+  const [orderDateRange, setOrderDateRange] = useState<DateRange | undefined>({
+    from: filters.orderDateFrom ? new Date(filters.orderDateFrom) : undefined,
+    to: filters.orderDateTo ? new Date(filters.orderDateTo) : undefined,
+  })
 
-  // 載入選項資料（商品、時間框架等）
+  // 載入選項資料
   const [options, setOptions] = useState<{
+    tradeTypes: Array<{ id: string; name: string }>
     commodities: Array<{ id: string; name: string }>
     timeframes: Array<{ id: string; name: string }>
     entryTypes: Array<{ id: string; name: string }>
     trendlineTypes: Array<{ id: string; name: string }>
   }>({
+    tradeTypes: [],
     commodities: [],
     timeframes: [],
     entryTypes: [],
@@ -55,17 +61,22 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
   })
 
   useEffect(() => {
-    // TODO: 從 API 載入選項資料
-    // 這裡先使用空陣列，之後需要實作 API
     async function loadOptions() {
       try {
-        // const [commodities, timeframes, entryTypes, trendlineTypes] = await Promise.all([
-        //   fetch('/api/options/commodities').then(r => r.json()),
-        //   fetch('/api/options/timeframes').then(r => r.json()),
-        //   fetch('/api/options/entry-types').then(r => r.json()),
-        //   fetch('/api/options/trendline-types').then(r => r.json()),
-        // ])
-        // setOptions({ commodities, timeframes, entryTypes, trendlineTypes })
+        const [tradeTypes, commodities, timeframes, entryTypes, trendlineTypes] = await Promise.all([
+          fetch('/api/options/trade-types').then(r => r.json()).then(res => res.data || []),
+          fetch('/api/options/commodities').then(r => r.json()).then(res => res.data || []),
+          fetch('/api/options/timeframes').then(r => r.json()).then(res => res.data || []),
+          fetch('/api/options/entry-types').then(r => r.json()).then(res => res.data || []),
+          fetch('/api/options/trendline-types').then(r => r.json()).then(res => res.data || []),
+        ])
+        setOptions({ 
+          tradeTypes: Array.isArray(tradeTypes) ? tradeTypes : [],
+          commodities: Array.isArray(commodities) ? commodities : [],
+          timeframes: Array.isArray(timeframes) ? timeframes : [],
+          entryTypes: Array.isArray(entryTypes) ? entryTypes : [],
+          trendlineTypes: Array.isArray(trendlineTypes) ? trendlineTypes : []
+        })
       } catch (error) {
         console.error('Failed to load options:', error)
       }
@@ -83,6 +94,16 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
     }))
   }
 
+  // 處理下單日期範圍變更
+  const handleOrderDateRangeChange = (range: DateRange | undefined) => {
+    setOrderDateRange(range)
+    setLocalFilters((prev) => ({
+      ...prev,
+      orderDateFrom: range?.from ? format(range.from, 'yyyy-MM-dd') : undefined,
+      orderDateTo: range?.to ? format(range.to, 'yyyy-MM-dd') : undefined,
+    }))
+  }
+
   // 套用篩選
   const handleApply = () => {
     onFiltersChange(localFilters)
@@ -93,19 +114,22 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
     const emptyFilters: TradeFilters = {}
     setLocalFilters(emptyFilters)
     setDateRange(undefined)
+    setOrderDateRange(undefined)
     onFiltersChange(emptyFilters)
   }
 
   return (
-    <Card>
+    <Card className="border-dashed shadow-sm">
       <CardContent className="pt-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {/* 第一行：日期與基本屬性 */}
+          
           {/* 日期區間 */}
           <div className="space-y-2">
-            <Label>交易日期</Label>
-            <Popover>
+            <Label className="text-xs font-semibold text-muted-foreground">交易日(圖表日期)</Label>
+            <Popover modal={true}>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                <Button variant="outline" className="w-full justify-start text-left font-normal h-9">
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dateRange?.from ? (
                     dateRange.to ? (
@@ -117,7 +141,7 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
                       format(dateRange.from, 'yyyy/MM/dd', { locale: zhTW })
                     )
                   ) : (
-                    <span>選擇日期範圍</span>
+                    <span className="text-muted-foreground">選擇日期範圍</span>
                   )}
                 </Button>
               </PopoverTrigger>
@@ -135,9 +159,189 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
             </Popover>
           </div>
 
-          {/* 勝敗篩選 */}
+          {/* 下單日區間 */}
           <div className="space-y-2">
-            <Label>交易結果</Label>
+            <Label className="text-xs font-semibold text-muted-foreground">下單日</Label>
+            <Popover modal={true}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start text-left font-normal h-9">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {orderDateRange?.from ? (
+                    orderDateRange.to ? (
+                      <>
+                        {format(orderDateRange.from, 'yyyy/MM/dd', { locale: zhTW })} -{' '}
+                        {format(orderDateRange.to, 'yyyy/MM/dd', { locale: zhTW })}
+                      </>
+                    ) : (
+                      format(orderDateRange.from, 'yyyy/MM/dd', { locale: zhTW })
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">選擇日期範圍</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={orderDateRange?.from}
+                  selected={orderDateRange}
+                  onSelect={handleOrderDateRangeChange}
+                  numberOfMonths={2}
+                  locale={zhTW}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* 交易類型 */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground">交易類型</Label>
+            <Select
+              value={localFilters.tradeTypeIds?.[0] || 'all'}
+              onValueChange={(value) =>
+                setLocalFilters((prev) => ({
+                  ...prev,
+                  tradeTypeIds: value === 'all' ? undefined : [value],
+                }))
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="全部" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                {options.tradeTypes.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>{opt.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 商品 */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground">商品</Label>
+            <Select
+              value={localFilters.commodityIds?.[0] || 'all'}
+              onValueChange={(value) =>
+                setLocalFilters((prev) => ({
+                  ...prev,
+                  commodityIds: value === 'all' ? undefined : [value],
+                }))
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="全部" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                {options.commodities.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>{opt.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 做多/做空 */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground">做多/做空</Label>
+            <Select
+              value={localFilters.positions?.[0] || 'all'}
+              onValueChange={(value) =>
+                setLocalFilters((prev) => ({
+                  ...prev,
+                  positions: value === 'all' ? undefined : [value as 'LONG' | 'SHORT'],
+                }))
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="全部" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                <SelectItem value="LONG">做多</SelectItem>
+                <SelectItem value="SHORT">做空</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 第二行：技術分析屬性 */}
+
+          {/* 時間框架 */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground">時間框架</Label>
+            <Select
+              value={localFilters.timeframeIds?.[0] || 'all'}
+              onValueChange={(value) =>
+                setLocalFilters((prev) => ({
+                  ...prev,
+                  timeframeIds: value === 'all' ? undefined : [value],
+                }))
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="全部" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                {options.timeframes.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>{opt.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 進場模式 */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground">進場模式</Label>
+            <Select
+              value={localFilters.entryTypeIds?.[0] || 'all'}
+              onValueChange={(value) =>
+                setLocalFilters((prev) => ({
+                  ...prev,
+                  entryTypeIds: value === 'all' ? undefined : [value],
+                }))
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="全部" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                {options.entryTypes.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>{opt.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 趨勢線 */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground">趨勢線</Label>
+            <Select
+              value={localFilters.trendlineTypeIds?.[0] || 'all'}
+              onValueChange={(value) =>
+                setLocalFilters((prev) => ({
+                  ...prev,
+                  trendlineTypeIds: value === 'all' ? undefined : [value],
+                }))
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="全部" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                {options.trendlineTypes.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>{opt.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 交易結果 */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground">交易結果</Label>
             <Select
               value={localFilters.winLoss || 'all'}
               onValueChange={(value) =>
@@ -147,7 +351,7 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
                 }))
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue placeholder="全部" />
               </SelectTrigger>
               <SelectContent>
@@ -159,14 +363,17 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
             </Select>
           </div>
 
+          {/* 第三行：數值與搜尋 */}
+
           {/* R 倍數範圍 */}
           <div className="space-y-2">
-            <Label>R 倍數範圍</Label>
+            <Label className="text-xs font-semibold text-muted-foreground">R 倍數範圍</Label>
             <div className="flex items-center gap-2">
               <Input
                 type="number"
                 step="0.1"
                 placeholder="最小"
+                className="h-9"
                 value={localFilters.actualExitRMin ?? ''}
                 onChange={(e) =>
                   setLocalFilters((prev) => ({
@@ -175,11 +382,12 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
                   }))
                 }
               />
-              <span>~</span>
+              <span className="text-muted-foreground">-</span>
               <Input
                 type="number"
                 step="0.1"
                 placeholder="最大"
+                className="h-9"
                 value={localFilters.actualExitRMax ?? ''}
                 onChange={(e) =>
                   setLocalFilters((prev) => ({
@@ -191,14 +399,14 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
             </div>
           </div>
 
-          {/* 關鍵字搜尋 */}
-          <div className="space-y-2">
-            <Label>關鍵字搜尋</Label>
+          {/* 備註文字搜尋 */}
+          <div className="space-y-2 md:col-span-2 lg:col-span-1 xl:col-span-1">
+            <Label className="text-xs font-semibold text-muted-foreground">備註文字搜尋</Label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜尋備註..."
-                className="pl-8"
+                className="pl-8 h-9"
                 value={localFilters.keyword ?? ''}
                 onChange={(e) =>
                   setLocalFilters((prev) => ({
@@ -209,17 +417,17 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
               />
             </div>
           </div>
-
-          {/* TODO: 多選篩選器（商品、時間框架等） */}
-          {/* 這些需要實作 multi-select 組件 */}
         </div>
 
         {/* 操作按鈕 */}
-        <div className="flex items-center justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={handleReset}>
-            重置
+        <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t">
+          <Button variant="ghost" size="sm" onClick={handleReset} className="h-9">
+            <RotateCcw className="mr-2 h-3.5 w-3.5" />
+            重置條件
           </Button>
-          <Button onClick={handleApply}>套用篩選</Button>
+          <Button size="sm" onClick={handleApply} className="h-9">
+            套用篩選
+          </Button>
         </div>
       </CardContent>
     </Card>

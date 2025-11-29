@@ -10,16 +10,25 @@ datasource db {
 }
 
 // ==========================================
+// 枚舉定義
+// ==========================================
+
+enum Position {
+  LONG // 做多
+  SHORT // 做空
+}
+
+// ==========================================
 // 選項管理 Models
 // ==========================================
 
 model Commodity {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  displayOrder Int     @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String   @unique
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   trades Trade[]
 
@@ -27,12 +36,12 @@ model Commodity {
 }
 
 model Timeframe {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  displayOrder Int     @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String   @unique
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   trades Trade[]
 
@@ -40,12 +49,12 @@ model Timeframe {
 }
 
 model EntryType {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  displayOrder Int     @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String   @unique
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   tradeEntryTypes TradeEntryType[]
 
@@ -53,12 +62,12 @@ model EntryType {
 }
 
 model TrendlineType {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  displayOrder Int     @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String   @unique
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   trades Trade[]
 
@@ -66,12 +75,12 @@ model TrendlineType {
 }
 
 model TradeType {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  displayOrder Int     @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String   @unique
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   trades Trade[]
 
@@ -83,19 +92,20 @@ model TradeType {
 // ==========================================
 
 model Trade {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  tradeDate     DateTime @map("trade_date")     // 交易日（圖表日期）
-  orderDate     DateTime @map("order_date")     // 下單日（實際下單時間）
-  tradeTypeId   String?  @map("trade_type_id")  // 交易類型（實盤、回測等）
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  tradeDate   DateTime @map("trade_date") // 交易日（圖表日期）
+  orderDate   DateTime @map("order_date") // 下單日（實際下單時間）
+  tradeTypeId String?  @map("trade_type_id") // 交易類型（實盤、回測等）
 
   // 基本資訊
   commodityId     String?  @map("commodity_id")
   timeframeId     String?  @map("timeframe_id")
   trendlineTypeId String?  @map("trendline_type_id")
+  position        Position @default(LONG) // 做多或做空
 
   // RR 計算欄位
-  stopLossTicks Int     @map("stop_loss_ticks")    // 停損點數
+  stopLossTicks Int     @map("stop_loss_ticks") // 停損點數
   targetR       Decimal @map("target_r") @db.Decimal(10, 2) // 目標獲勝R (賠R固定為1)
   actualExitR   Decimal @map("actual_exit_r") @db.Decimal(10, 2) // 實際出場R (範圍: -1 到 targetR)
   leverage      Decimal @map("leverage") @db.Decimal(10, 2) // 槓桿倍數
@@ -118,7 +128,7 @@ model Trade {
   tradeType     TradeType?     @relation(fields: [tradeTypeId], references: [id], onDelete: SetNull)
 
   // 多對多關聯
-  tradeEntryTypes   TradeEntryType[]
+  tradeEntryTypes TradeEntryType[]
 
   @@index([userId])
   @@index([tradeDate])
@@ -128,6 +138,7 @@ model Trade {
   @@index([trendlineTypeId])
   @@index([tradeTypeId])
   @@index([winLoss])
+  @@index([position])
   @@map("trades")
 }
 
@@ -154,14 +165,14 @@ model TradeEntryType {
 // ==========================================
 
 model UserPreference {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
+  id     String @id @default(uuid())
+  userId String @map("user_id")
 
   // 設定類型
-  type      String   // 'datatable_columns', 'datatable_filters', etc.
+  type String // 'datatable_columns', 'datatable_filters', etc.
 
   // 設定內容（JSON）
-  settings  Json
+  settings Json
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

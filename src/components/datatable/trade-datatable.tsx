@@ -256,10 +256,11 @@ export function TradeDataTable() {
         onColumnVisibilityChange={handleColumnVisibilityChange}
         columns={TRADE_COLUMNS}
         data={data?.data || []}
+        sort={sort}
       />
 
       {/* 表格 */}
-      <Card>
+      <Card className="py-2 gap-0">
         <div className="relative w-full overflow-auto">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
@@ -358,7 +359,7 @@ export function TradeDataTable() {
 
         {/* 分頁控制 */}
         {data && (
-          <div className="flex items-center justify-between px-4 py-4 border-t">
+          <div className="flex items-center justify-between px-4 py-2 border-t">
             <div className="flex items-center gap-4">
               <div className="text-sm text-muted-foreground">
                 顯示第 {(data.meta.currentPage - 1) * data.meta.pageSize + 1} -{' '}

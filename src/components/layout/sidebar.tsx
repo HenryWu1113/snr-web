@@ -72,7 +72,43 @@ const NAV_GROUPS: NavGroup[] = [
         title: '統計分析',
         href: '/analytics',
         icon: BarChart3,
-        disabled: true, // 示範：未完成的功能
+        children: [
+          {
+            title: '總覽',
+            href: '/analytics',
+            icon: BarChart3,
+          },
+          {
+            title: '商品分析',
+            href: '/analytics/commodity',
+            icon: Package,
+          },
+          {
+            title: '交易類型分析',
+            href: '/analytics/trade-type',
+            icon: Circle,
+          },
+          {
+            title: '時間框架分析',
+            href: '/analytics/timeframe',
+            icon: Clock,
+          },
+          {
+            title: '趨勢線類型分析',
+            href: '/analytics/trendline',
+            icon: TrendingUp,
+          },
+          {
+            title: '做多/做空分析',
+            href: '/analytics/position',
+            icon: ArrowRight,
+          },
+          {
+            title: '進場類型分析',
+            href: '/analytics/entry-type',
+            icon: ArrowRight,
+          },
+        ],
       },
     ],
   },

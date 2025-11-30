@@ -8,7 +8,24 @@ import { TrendingUp, TrendingDown } from 'lucide-react'
 import type { ColumnDef } from '@/types/datatable'
 import type { TradeWithRelations } from '@/types/datatable'
 
+import { TradeImageCell } from '@/components/trades/trade-image-cell'
+
 export const TRADE_COLUMNS: ColumnDef<TradeWithRelations>[] = [
+  {
+    id: 'id',
+    field: 'id',
+    header: 'ID',
+    sortable: true,
+    filterable: true,
+    type: 'string',
+    visible: false, // 預設隱藏，因為通常不需要看 UUID
+    width: 80,
+    format: (value: string) => (
+      <span className="font-mono text-xs text-muted-foreground" title={value}>
+        {value.substring(0, 8)}...
+      </span>
+    ),
+  },
   {
     id: 'orderDate',
     field: 'orderDate',
@@ -240,8 +257,30 @@ export const TRADE_COLUMNS: ColumnDef<TradeWithRelations>[] = [
     filterable: false,
     type: 'date',
     visible: false,
-    width: 150,
-    format: (value: Date) => format(new Date(value), 'yyyy/MM/dd HH:mm', { locale: zhTW }),
+    width: 160,
+    format: (value: Date) => format(new Date(value), 'yyyy/MM/dd HH:mm:ss', { locale: zhTW }),
+  },
+  {
+    id: 'updatedAt',
+    field: 'updatedAt',
+    header: '更新時間',
+    sortable: true,
+    filterable: false,
+    type: 'date',
+    visible: false,
+    width: 160,
+    format: (value: Date) => format(new Date(value), 'yyyy/MM/dd HH:mm:ss', { locale: zhTW }),
+  },
+  {
+    id: 'images',
+    field: 'screenshotUrls',
+    header: '圖片',
+    sortable: false,
+    filterable: false,
+    type: 'string', // 雖然是陣列，但這裡主要用於渲染
+    visible: true,
+    width: 60,
+    format: (value: any[]) => <TradeImageCell images={value} />,
   },
 ]
 

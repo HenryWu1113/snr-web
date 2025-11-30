@@ -46,15 +46,23 @@ export type DateRangePreset =
 
 interface DateRangeSelectorProps {
   onRangeChange: (range: { from: Date; to: Date }) => void
+  defaultPreset?: DateRangePreset
+  defaultCustomRange?: DateRange
 }
 
-export function DateRangeSelector({ onRangeChange }: DateRangeSelectorProps) {
-  const [preset, setPreset] = useState<DateRangePreset>('thisWeek')
-  // 自定義區間預設為最近30天
-  const [customRange, setCustomRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 29),
-    to: new Date()
-  })
+export function DateRangeSelector({ 
+  onRangeChange,
+  defaultPreset = 'thisWeek',
+  defaultCustomRange
+}: DateRangeSelectorProps) {
+  const [preset, setPreset] = useState<DateRangePreset>(defaultPreset)
+  // 自定義區間預設為最近30天，或傳入的預設值
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(
+    defaultCustomRange || {
+      from: subDays(new Date(), 29),
+      to: new Date()
+    }
+  )
 
   // 計算預設時間範圍
   const getDateRange = (

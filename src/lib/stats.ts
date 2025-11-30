@@ -14,6 +14,8 @@ export interface TradeStats {
   longestLossStreak: number
   bestTrade: number
   worstTrade: number
+  avgProfitLoss: number
+  avgTargetR: number
 }
 
 export function calculateStats(trades: Trade[]): TradeStats {
@@ -31,6 +33,8 @@ export function calculateStats(trades: Trade[]): TradeStats {
       longestLossStreak: 0,
       bestTrade: 0,
       worstTrade: 0,
+      avgProfitLoss: 0,
+      avgTargetR: 0,
     }
   }
 
@@ -44,6 +48,10 @@ export function calculateStats(trades: Trade[]): TradeStats {
   )
   const totalRMultiple = trades.reduce(
     (sum, t) => sum + Number(t.actualExitR),
+    0
+  )
+  const totalTargetR = trades.reduce(
+    (sum, t) => sum + Number(t.targetR),
     0
   )
 
@@ -83,6 +91,8 @@ export function calculateStats(trades: Trade[]): TradeStats {
     longestLossStreak,
     bestTrade,
     worstTrade,
+    avgProfitLoss: totalProfitLoss / trades.length,
+    avgTargetR: totalTargetR / trades.length,
   }
 }
 
@@ -122,4 +132,84 @@ export function groupTradesByDate(
   })
 
   return grouped
+}
+
+// ==========================================
+// 統計分析專用函數
+// ==========================================
+
+export interface DimensionStats extends TradeStats {
+  id: string
+  name: string
+  avgTargetR: number
+}
+
+/**
+ * 按維度分組統計（商品、交易類型、時間框架等）
+ */
+/**
+ * 按維度分組統計（商品、交易類型、時間框架等）
+ */
+export function groupStatsByDimension(
+  trades: (Trade & { tradeEntryTypes?: { entryTypeId: string }[] })[],
+  dimension: 'commodity' | 'tradeType' | 'timeframe' | 'trendline' | 'position' | 'entryType',
+  dimensionData: Map<string, string> // id -> name mapping
+): DimensionStats[] {
+  const grouped = new Map<string, Trade[]>()
+
+  trades.forEach((trade) => {
+    if (dimension === 'entryType') {
+      // 多對多關係處理
+      if (trade.tradeEntryTypes && trade.tradeEntryTypes.length > 0) {
+        trade.tradeEntryTypes.forEach((entry) => {
+          const key = entry.entryTypeId
+          if (!grouped.has(key)) {
+            grouped.set(key, [])
+          }
+          grouped.get(key)!.push(trade)
+        })
+      }
+      return
+    }
+
+    let key: string | null = null
+    
+    switch (dimension) {
+      case 'commodity':
+        key = trade.commodityId
+        break
+      case 'tradeType':
+        key = trade.tradeTypeId
+        break
+      case 'timeframe':
+        key = trade.timeframeId
+        break
+      case 'trendline':
+        key = trade.trendlineTypeId
+        break
+      case 'position':
+        key = trade.position
+        break
+    }
+
+    if (!key) return // 跳過沒有設定的交易
+
+    if (!grouped.has(key)) {
+      grouped.set(key, [])
+    }
+    grouped.get(key)!.push(trade)
+  })
+
+  const results: DimensionStats[] = []
+
+  grouped.forEach((groupTrades, id) => {
+    const stats = calculateStats(groupTrades)
+    results.push({
+      ...stats,
+      id,
+      name: dimensionData.get(id) || id,
+    })
+  })
+
+  return results.sort((a, b) => b.totalRMultiple - a.totalRMultiple)
 }

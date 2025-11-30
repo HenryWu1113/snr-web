@@ -352,8 +352,29 @@ export function TradeModal({
             <DialogTitle>
               {isEditMode ? '編輯交易紀錄' : '新增交易紀錄'}
             </DialogTitle>
-            <DialogDescription>
-              {isEditMode ? '修改交易詳細資訊' : '填寫交易詳細資訊並上傳截圖'}
+            <DialogDescription asChild>
+              <div>
+                {isEditMode ? (
+                  <div className="flex flex-col gap-1 mt-1.5">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="shrink-0">ID:</span>
+                      <span className="font-mono select-all text-foreground/80">{trade?.id}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <span>建立:</span>
+                        <span className="font-mono">{trade?.createdAt ? format(new Date(trade.createdAt), 'yyyy/MM/dd HH:mm:ss') : '-'}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span>更新:</span>
+                        <span className="font-mono">{trade?.updatedAt ? format(new Date(trade.updatedAt), 'yyyy/MM/dd HH:mm:ss') : '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  '填寫交易詳細資訊並上傳截圖'
+                )}
+              </div>
             </DialogDescription>
           </DialogHeader>
 

@@ -18,6 +18,13 @@ enum Position {
   SHORT // 做空
 }
 
+enum TradingSession {
+  ASIAN // 亞洲盤
+  LONDON // 倫敦盤
+  NEWYORK // 紐約盤
+  OVERLAP // 重疊時段
+}
+
 // ==========================================
 // 選項管理 Models
 // ==========================================
@@ -87,6 +94,19 @@ model TradeType {
   @@map("trade_types")
 }
 
+model TradingTag {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tradeTags TradeTag[]
+
+  @@map("trading_tags")
+}
+
 // ==========================================
 // 交易紀錄 Model
 // ==========================================
@@ -118,6 +138,10 @@ model Trade {
   notes          String?
   screenshotUrls Json?   @map("screenshot_urls") // CloudinaryImage[]
 
+  // 新增欄位
+  tradingSession     TradingSession? @map("trading_session") // 交易時段（自動判斷）
+  holdingTimeMinutes Int?            @map("holding_time_minutes") // 持倉時間（分鐘）
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -129,6 +153,7 @@ model Trade {
 
   // 多對多關聯
   tradeEntryTypes TradeEntryType[]
+  tradeTags       TradeTag[]
 
   @@index([userId])
   @@index([tradeDate])
@@ -139,6 +164,7 @@ model Trade {
   @@index([tradeTypeId])
   @@index([winLoss])
   @@index([position])
+  @@index([tradingSession])
   @@map("trades")
 }
 
@@ -158,6 +184,20 @@ model TradeEntryType {
   @@index([tradeId])
   @@index([entryTypeId])
   @@map("trade_entry_types")
+}
+
+model TradeTag {
+  id      String @id @default(uuid())
+  tradeId String @map("trade_id")
+  tagId   String @map("tag_id")
+
+  trade Trade      @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  tag   TradingTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, tagId])
+  @@index([tradeId])
+  @@index([tagId])
+  @@map("trade_tags")
 }
 
 // ==========================================

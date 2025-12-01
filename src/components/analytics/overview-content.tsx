@@ -17,6 +17,9 @@ import {
   Target,
   DollarSign,
   ArrowRight,
+  Globe,
+  Tag,
+  Timer,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -108,6 +111,27 @@ export function AnalyticsOverviewContent({
       subtitle: '比較不同進場策略表現',
       href: '/analytics/entry-type',
       icon: <ArrowRight className="h-5 w-5" />,
+    },
+    {
+      title: '交易時段分析',
+      value: '查看',
+      subtitle: '分析不同時段的交易表現',
+      href: '/analytics/trading-session',
+      icon: <Globe className="h-5 w-5" />,
+    },
+    {
+      title: '自定義標籤分析',
+      value: '查看',
+      subtitle: '分析不同標籤的交易表現',
+      href: '/analytics/tags',
+      icon: <Tag className="h-5 w-5" />,
+    },
+    {
+      title: '持倉時間分析',
+      value: '查看',
+      subtitle: '分析持倉時間與績效的關係',
+      href: '/analytics/holding-time',
+      icon: <Timer className="h-5 w-5" />,
     },
   ]
 

@@ -147,19 +147,19 @@ export interface DimensionStats extends TradeStats {
 /**
  * 按維度分組統計（商品、交易類型、時間框架等）
  */
-/**
- * 按維度分組統計（商品、交易類型、時間框架等）
- */
 export function groupStatsByDimension(
-  trades: (Trade & { tradeEntryTypes?: { entryTypeId: string }[] })[],
-  dimension: 'commodity' | 'tradeType' | 'timeframe' | 'trendline' | 'position' | 'entryType',
+  trades: (Trade & { 
+    tradeEntryTypes?: { entryTypeId: string }[]
+    tradeTags?: { tagId: string; tag: { id: string; name: string } }[]
+  })[],
+  dimension: 'commodity' | 'tradeType' | 'timeframe' | 'trendline' | 'position' | 'entryType' | 'tradingSession' | 'tags' | 'holdingTime',
   dimensionData: Map<string, string> // id -> name mapping
 ): DimensionStats[] {
   const grouped = new Map<string, Trade[]>()
 
   trades.forEach((trade) => {
+    // 多對多關係處理 - Entry Type
     if (dimension === 'entryType') {
-      // 多對多關係處理
       if (trade.tradeEntryTypes && trade.tradeEntryTypes.length > 0) {
         trade.tradeEntryTypes.forEach((entry) => {
           const key = entry.entryTypeId
@@ -168,6 +168,39 @@ export function groupStatsByDimension(
           }
           grouped.get(key)!.push(trade)
         })
+      }
+      return
+    }
+
+    // 多對多關係處理 - Tags
+    if (dimension === 'tags') {
+      if (trade.tradeTags && trade.tradeTags.length > 0) {
+        trade.tradeTags.forEach((tt) => {
+          const key = tt.tagId
+          if (!grouped.has(key)) {
+            grouped.set(key, [])
+          }
+          grouped.get(key)!.push(trade)
+        })
+      }
+      return
+    }
+
+    // 特殊處理 - Holding Time 分組
+    if (dimension === 'holdingTime') {
+      const minutes = trade.holdingTimeMinutes
+      if (minutes !== null && minutes !== undefined) {
+        let key: string
+        if (minutes < 30) key = '0-30'
+        else if (minutes < 60) key = '30-60'
+        else if (minutes < 120) key = '60-120'
+        else if (minutes < 240) key = '120-240'
+        else key = '240+'
+
+        if (!grouped.has(key)) {
+          grouped.set(key, [])
+        }
+        grouped.get(key)!.push(trade)
       }
       return
     }
@@ -189,6 +222,9 @@ export function groupStatsByDimension(
         break
       case 'position':
         key = trade.position
+        break
+      case 'tradingSession':
+        key = trade.tradingSession
         break
     }
 

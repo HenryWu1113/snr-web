@@ -76,6 +76,14 @@ export const tradeFormSchema = z
     // 備註
     notes: z.string().optional(),
 
+    // 新增欄位
+    tagIds: z.array(z.string()).optional(), // 自定義標籤（多選，非必填）
+    holdingTimeMinutes: z.coerce
+      .number({ message: '持倉時間必須是數字' })
+      .int('持倉時間必須是整數')
+      .positive('持倉時間必須大於 0')
+      .optional(),
+
     // 截圖（多張）- 改成 File[] 而非 CloudinaryImage[]
     screenshots: z.array(z.instanceof(File)).optional()
   })

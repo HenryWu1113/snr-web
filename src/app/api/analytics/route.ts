@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
       | 'trendline'
       | 'position'
       | 'entryType'
+      | 'tradingSession'
+      | 'tags'
+      | 'holdingTime'
       | null
     const from = searchParams.get('from')
     const to = searchParams.get('to')
@@ -54,6 +57,11 @@ export async function GET(request: NextRequest) {
       orderBy: { orderDate: 'asc' },
       include: {
         tradeEntryTypes: true, // 載入進場類型關聯
+        tradeTags: {
+          include: {
+            tag: true,
+          },
+        },
       },
     })
 
@@ -110,6 +118,29 @@ export async function GET(request: NextRequest) {
       case 'position': {
         dimensionData.set('LONG', '做多')
         dimensionData.set('SHORT', '做空')
+        break
+      }
+      case 'tradingSession': {
+        dimensionData.set('ASIAN', '亞洲盤')
+        dimensionData.set('LONDON', '倫敦盤')
+        dimensionData.set('NEWYORK', '紐約盤')
+        dimensionData.set('OVERLAP', '重疊時段')
+        break
+      }
+      case 'tags': {
+        const tags = await prisma.tradingTag.findMany({
+          where: { isActive: true },
+        })
+        tags.forEach((t) => dimensionData.set(t.id, t.name))
+        break
+      }
+      case 'holdingTime': {
+        // 持倉時間分組
+        dimensionData.set('0-30', '0-30分鐘')
+        dimensionData.set('30-60', '30-60分鐘')
+        dimensionData.set('60-120', '1-2小時')
+        dimensionData.set('120-240', '2-4小時')
+        dimensionData.set('240+', '4小時以上')
         break
       }
     }

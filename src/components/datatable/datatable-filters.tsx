@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Calendar } from '@/components/ui/calendar'
 import {
   Popover,
@@ -28,6 +29,7 @@ import { zhTW } from 'date-fns/locale'
 import { CalendarIcon, Search, RotateCcw } from 'lucide-react'
 import type { TradeFilters } from '@/types/datatable'
 import type { DateRange } from 'react-day-picker'
+import { useTradeOptions } from '@/hooks/use-trade-options'
 
 interface DataTableFiltersProps {
   filters: TradeFilters
@@ -45,44 +47,8 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
     to: filters.orderDateTo ? new Date(filters.orderDateTo) : undefined,
   })
 
-  // 載入選項資料
-  const [options, setOptions] = useState<{
-    tradeTypes: Array<{ id: string; name: string }>
-    commodities: Array<{ id: string; name: string }>
-    timeframes: Array<{ id: string; name: string }>
-    entryTypes: Array<{ id: string; name: string }>
-    trendlineTypes: Array<{ id: string; name: string }>
-  }>({
-    tradeTypes: [],
-    commodities: [],
-    timeframes: [],
-    entryTypes: [],
-    trendlineTypes: [],
-  })
-
-  useEffect(() => {
-    async function loadOptions() {
-      try {
-        const [tradeTypes, commodities, timeframes, entryTypes, trendlineTypes] = await Promise.all([
-          fetch('/api/options/trade-types').then(r => r.json()).then(res => res.data || []),
-          fetch('/api/options/commodities').then(r => r.json()).then(res => res.data || []),
-          fetch('/api/options/timeframes').then(r => r.json()).then(res => res.data || []),
-          fetch('/api/options/entry-types').then(r => r.json()).then(res => res.data || []),
-          fetch('/api/options/trendline-types').then(r => r.json()).then(res => res.data || []),
-        ])
-        setOptions({ 
-          tradeTypes: Array.isArray(tradeTypes) ? tradeTypes : [],
-          commodities: Array.isArray(commodities) ? commodities : [],
-          timeframes: Array.isArray(timeframes) ? timeframes : [],
-          entryTypes: Array.isArray(entryTypes) ? entryTypes : [],
-          trendlineTypes: Array.isArray(trendlineTypes) ? trendlineTypes : []
-        })
-      } catch (error) {
-        console.error('Failed to load options:', error)
-      }
-    }
-    loadOptions()
-  }, [])
+  // 載入選項資料 (使用快取 hook)
+  const { options } = useTradeOptions()
 
   // 處理日期範圍變更
   const handleDateRangeChange = (range: DateRange | undefined) => {
@@ -121,7 +87,7 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
   return (
     <Card className="border-dashed shadow-sm">
       <CardContent className="pt-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {/* 第一行：日期與基本屬性 */}
           
           {/* 日期區間 */}
@@ -291,30 +257,6 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
             </Select>
           </div>
 
-          {/* 進場模式 */}
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold text-muted-foreground">進場模式</Label>
-            <Select
-              value={localFilters.entryTypeIds?.[0] || 'all'}
-              onValueChange={(value) =>
-                setLocalFilters((prev) => ({
-                  ...prev,
-                  entryTypeIds: value === 'all' ? undefined : [value],
-                }))
-              }
-            >
-              <SelectTrigger className="h-9 w-full">
-                <SelectValue placeholder="全部" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部</SelectItem>
-                {options.entryTypes.map((opt) => (
-                  <SelectItem key={opt.id} value={opt.id}>{opt.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* 趨勢線 */}
           <div className="space-y-2">
             <Label className="text-xs font-semibold text-muted-foreground">趨勢線</Label>
@@ -363,7 +305,64 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
             </Select>
           </div>
 
-          {/* 第三行：數值與搜尋 */}
+          {/* 交易時段 */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground">交易時段</Label>
+            <Select
+              value={localFilters.tradingSession || 'all'}
+              onValueChange={(value) =>
+                setLocalFilters((prev) => ({
+                  ...prev,
+                  tradingSession: value === 'all' ? undefined : value as 'ASIAN' | 'LONDON' | 'NEWYORK' | 'OVERLAP',
+                }))
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="全部" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                <SelectItem value="ASIAN">亞洲盤</SelectItem>
+                <SelectItem value="LONDON">倫敦盤</SelectItem>
+                <SelectItem value="NEWYORK">紐約盤</SelectItem>
+                <SelectItem value="OVERLAP">重疊時段</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 持倉時間（分鐘）*/}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground">持倉時間（分鐘）</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                placeholder="最小"
+                className="h-9"
+                value={localFilters.holdingTimeMin ?? ''}
+                onChange={(e) =>
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    holdingTimeMin: e.target.value ? Number(e.target.value) : undefined,
+                  }))
+                }
+              />
+              <span className="text-muted-foreground">-</span>
+              <Input
+                type="number"
+                placeholder="最大"
+                className="h-9"
+                value={localFilters.holdingTimeMax ?? ''}
+                onChange={(e) =>
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    holdingTimeMax: e.target.value ? Number(e.target.value) : undefined,
+                  }))
+                }
+              />
+            </div>
+          </div>
+
+          {/* 第四行：數值與搜尋 */}
 
           {/* R 倍數範圍 */}
           <div className="space-y-2">
@@ -415,6 +414,78 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
                   }))
                 }
               />
+            </div>
+          </div>
+
+          {/* 進場模式（多選）*/}
+          <div className="space-y-2 col-span-full">
+            <Label className="text-xs font-semibold text-muted-foreground">進場模式（可多選）</Label>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 p-2 border rounded-md bg-muted/30">
+              {options.entryTypes.length > 0 ? (
+                options.entryTypes.map((opt) => (
+                  <div key={opt.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`entry-${opt.id}`}
+                      checked={localFilters.entryTypeIds?.includes(opt.id) || false}
+                      onCheckedChange={(checked) => {
+                        const current = localFilters.entryTypeIds || []
+                        setLocalFilters((prev) => ({
+                          ...prev,
+                          entryTypeIds: checked
+                            ? [...current, opt.id]
+                            : current.filter((id) => id !== opt.id),
+                        }))
+                      }}
+                    />
+                    <label
+                      htmlFor={`entry-${opt.id}`}
+                      className="text-sm cursor-pointer select-none leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      {opt.name}
+                    </label>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground col-span-full text-center py-1">
+                  無選項
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* 自定義標籤（多選）*/}
+          <div className="space-y-2 col-span-full">
+            <Label className="text-xs font-semibold text-muted-foreground">自定義標籤（可多選）</Label>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 p-2 border rounded-md bg-muted/30">
+              {options.tradingTags.length > 0 ? (
+                options.tradingTags.map((opt) => (
+                  <div key={opt.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`tag-${opt.id}`}
+                      checked={localFilters.tagIds?.includes(opt.id) || false}
+                      onCheckedChange={(checked) => {
+                        const current = localFilters.tagIds || []
+                        setLocalFilters((prev) => ({
+                          ...prev,
+                          tagIds: checked
+                            ? [...current, opt.id]
+                            : current.filter((id) => id !== opt.id),
+                        }))
+                      }}
+                    />
+                    <label
+                      htmlFor={`tag-${opt.id}`}
+                      className="text-sm cursor-pointer select-none leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      {opt.name}
+                    </label>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground col-span-full text-center py-1">
+                  無標籤
+                </p>
+              )}
             </div>
           </div>
         </div>

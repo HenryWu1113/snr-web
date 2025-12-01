@@ -168,6 +168,16 @@ export interface TradeFilters {
   // 勝敗篩選
   winLoss?: 'win' | 'loss' | 'breakeven' | 'all'
 
+  // 交易時段
+  tradingSession?: 'ASIAN' | 'LONDON' | 'NEWYORK' | 'OVERLAP'
+
+  // 自定義標籤（多選）
+  tagIds?: string[]
+
+  // 持倉時間範圍（分鐘）
+  holdingTimeMin?: number
+  holdingTimeMax?: number
+
   // 實際出場 R 區間
   actualExitRMin?: number
   actualExitRMax?: number
@@ -225,6 +235,17 @@ export interface TradeWithRelations {
 
   // 做多/做空
   position: 'LONG' | 'SHORT'
+
+  // 新增欄位
+  tradingSession: 'ASIAN' | 'LONDON' | 'NEWYORK' | 'OVERLAP' | null
+  holdingTimeMinutes: number | null
+  tradeTags: Array<{
+    id: string
+    tag: {
+      id: string
+      name: string
+    }
+  }>
 
   // 交易數據
   stopLossTicks: number

@@ -9,6 +9,8 @@ import type { ColumnDef } from '@/types/datatable'
 import type { TradeWithRelations } from '@/types/datatable'
 
 import { TradeImageCell } from '@/components/trades/trade-image-cell'
+import { getTradingSessionLabel, getTradingSessionColor } from '@/lib/trading-session'
+import { Badge } from '@/components/ui/badge'
 
 export const TRADE_COLUMNS: ColumnDef<TradeWithRelations>[] = [
   {
@@ -122,6 +124,78 @@ export const TRADE_COLUMNS: ColumnDef<TradeWithRelations>[] = [
           </div>
         )
       }
+    },
+  },
+  {
+    id: 'tradingSession',
+    field: 'tradingSession',
+    header: '交易時段',
+    sortable: true,
+    filterable: true,
+    type: 'enum',
+    visible: true,
+    width: 100,
+    filterOptions: [
+      { label: '亞洲盤', value: 'ASIAN' },
+      { label: '倫敦盤', value: 'LONDON' },
+      { label: '紐約盤', value: 'NEWYORK' },
+      { label: '重疊時段', value: 'OVERLAP' },
+    ],
+    format: (value: 'ASIAN' | 'LONDON' | 'NEWYORK' | 'OVERLAP' | null) => {
+      if (!value) return <span className="text-muted-foreground">-</span>
+      return (
+        <Badge variant="outline" className="text-xs font-medium">
+          {getTradingSessionLabel(value)}
+        </Badge>
+      )
+    },
+  },
+  {
+    id: 'holdingTime',
+    field: 'holdingTimeMinutes',
+    header: '持倉時間',
+    sortable: true,
+    filterable: false,
+    type: 'number',
+    visible: true,
+    width: 110,
+    format: (value: number | null) => {
+      if (!value) return <span className="text-muted-foreground">-</span>
+      const hours = Math.floor(value / 60)
+      const mins = value % 60
+      if (hours > 0) {
+        return <span className="text-xs">{hours}h {mins}m</span>
+      }
+      return <span className="text-xs">{mins}m</span>
+    },
+  },
+  {
+    id: 'tags',
+    field: 'tradeTags',
+    header: '標籤',
+    sortable: false,
+    filterable: false,
+    type: 'string',
+    visible: true,
+    width: 150,
+    format: (value: Array<{ tag: { name: string } }>) => {
+      if (!value || value.length === 0) {
+        return <span className="text-muted-foreground text-xs">-</span>
+      }
+      return (
+        <div className="flex flex-wrap gap-1">
+          {value.slice(0, 2).map((tt, idx) => (
+            <Badge key={idx} variant="secondary" className="text-xs">
+              {tt.tag.name}
+            </Badge>
+          ))}
+          {value.length > 2 && (
+            <Badge variant="outline" className="text-xs">
+              +{value.length - 2}
+            </Badge>
+          )}
+        </div>
+      )
     },
   },
   {

@@ -12,6 +12,7 @@ import {
   tradeApiSchema,
   determineWinLoss,
 } from '@/lib/validations/trade'
+import { determineTradingSession } from '@/lib/trading-session'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -50,6 +51,11 @@ export async function GET(
         tradeEntryTypes: {
           include: {
             entryType: true,
+          },
+        },
+        tradeTags: {
+          include: {
+            tag: true,
           },
         },
       },
@@ -109,6 +115,7 @@ export async function PUT(
 
     // 計算衍生欄位
     const winLoss = determineWinLoss(validatedData.actualExitR)
+    const tradingSession = determineTradingSession(validatedData.tradeDate)
 
     // 更新交易紀錄
     const trade = await prisma.trade.update({
@@ -130,11 +137,23 @@ export async function PUT(
         notes: validatedData.notes || null,
         screenshotUrls: validatedData.screenshots || [],
 
-        // 更新多對多關聯（先刪除舊的，再建立新的）
+        // 新增欄位
+        tradingSession,
+        holdingTimeMinutes: validatedData.holdingTimeMinutes || null,
+
+        // 更新多對多關聯 - 進場類型（先刪除舊的，再建立新的）
         tradeEntryTypes: {
           deleteMany: {},
           create: validatedData.entryTypeIds.map((entryTypeId: string) => ({
             entryTypeId,
+          })),
+        },
+
+        // 更新多對多關聯 - 自定義標籤
+        tradeTags: {
+          deleteMany: {},
+          create: (validatedData.tagIds || []).map((tagId: string) => ({
+            tagId,
           })),
         },
       },
@@ -146,6 +165,11 @@ export async function PUT(
         tradeEntryTypes: {
           include: {
             entryType: true,
+          },
+        },
+        tradeTags: {
+          include: {
+            tag: true,
           },
         },
       },

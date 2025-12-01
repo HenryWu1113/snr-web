@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
 interface DimensionAnalysisContentProps {
-  dimension: 'commodity' | 'tradeType' | 'timeframe' | 'trendline' | 'position' | 'entryType'
+  dimension: 'commodity' | 'tradeType' | 'timeframe' | 'trendline' | 'position' | 'entryType' | 'tradingSession' | 'tags' | 'holdingTime'
   title: string
   description: string
 }

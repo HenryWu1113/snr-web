@@ -99,6 +99,16 @@ export async function POST(request: NextRequest) {
               },
             },
           },
+          tradeTags: {
+            include: {
+              tag: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
         },
       }),
       prisma.trade.count({
@@ -118,6 +128,9 @@ export async function POST(request: NextRequest) {
       trendlineType: trade.trendlineType,
       position: trade.position as 'LONG' | 'SHORT',
       entryTypes: trade.tradeEntryTypes.map((tet) => tet.entryType),
+      tradingSession: trade.tradingSession as 'ASIAN' | 'LONDON' | 'NEWYORK' | 'OVERLAP' | null,
+      holdingTimeMinutes: trade.holdingTimeMinutes,
+      tradeTags: trade.tradeTags,
       stopLossTicks: trade.stopLossTicks,
       targetR: Number(trade.targetR),
       actualExitR: Number(trade.actualExitR),

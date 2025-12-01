@@ -10,6 +10,7 @@ import {
   tradeApiSchema,
   determineWinLoss,
 } from '@/lib/validations/trade'
+import { determineTradingSession } from '@/lib/trading-session'
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
 
     // 計算衍生欄位
     const winLoss = determineWinLoss(validatedData.actualExitR)
+    const tradingSession = determineTradingSession(validatedData.tradeDate)
 
     // 建立交易紀錄
     const trade = await prisma.trade.create({
@@ -51,10 +53,21 @@ export async function POST(request: NextRequest) {
         notes: validatedData.notes || null,
         screenshotUrls: validatedData.screenshots || [],
 
-        // 建立多對多關聯
+        // 新增欄位
+        tradingSession,
+        holdingTimeMinutes: validatedData.holdingTimeMinutes || null,
+
+        // 建立多對多關聯 - 進場類型
         tradeEntryTypes: {
           create: validatedData.entryTypeIds.map((entryTypeId: string) => ({
             entryTypeId,
+          })),
+        },
+
+        // 建立多對多關聯 - 自定義標籤
+        tradeTags: {
+          create: (validatedData.tagIds || []).map((tagId: string) => ({
+            tagId,
           })),
         },
       },
@@ -66,6 +79,11 @@ export async function POST(request: NextRequest) {
         tradeEntryTypes: {
           include: {
             entryType: true,
+          },
+        },
+        tradeTags: {
+          include: {
+            tag: true,
           },
         },
       },

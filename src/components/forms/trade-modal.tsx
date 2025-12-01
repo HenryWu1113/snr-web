@@ -49,6 +49,7 @@ import { cn } from '@/lib/utils'
 import type { TradeWithRelations } from '@/types/datatable'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
+import { determineTradingSession, getTradingSessionLabel } from '@/lib/trading-session'
 
 interface TradeModalProps {
   open: boolean
@@ -76,12 +77,14 @@ export function TradeModal({
     timeframes: OptionData[]
     trendlineTypes: OptionData[]
     entryTypes: OptionData[]
+    tradingTags: OptionData[]
   }>({
     tradeTypes: [],
     commodities: [],
     timeframes: [],
     trendlineTypes: [],
-    entryTypes: []
+    entryTypes: [],
+    tradingTags: []
   })
 
   const isEditMode = !!trade
@@ -89,6 +92,7 @@ export function TradeModal({
     newFiles: [],
     existingImages: []
   })
+  const [initialImageCount, setInitialImageCount] = useState(0)
 
   const {
     register,
@@ -97,7 +101,7 @@ export function TradeModal({
     watch,
     setValue,
     reset,
-    formState: { errors }
+    formState: { errors, isDirty }
   } = useForm<TradeFormData>({
     resolver: zodResolver(tradeFormSchema) as any,
     defaultValues: trade ? {
@@ -109,6 +113,8 @@ export function TradeModal({
       trendlineTypeId: trade.trendlineType?.id || '',
       position: trade.position || 'LONG',
       entryTypeIds: trade.entryTypes.map((et) => et.id),
+      tagIds: trade.tradeTags?.map((tt) => tt.tag.id) || [],
+      holdingTimeMinutes: trade.holdingTimeMinutes || undefined,
       stopLossTicks: trade.stopLossTicks,
       targetR: trade.targetR,
       actualExitR: trade.actualExitR,
@@ -121,6 +127,7 @@ export function TradeModal({
       orderDate: new Date(),
       position: 'LONG',
       entryTypeIds: [],
+      tagIds: [],
       screenshots: []
     }
   })
@@ -134,13 +141,15 @@ export function TradeModal({
           commodities,
           timeframes,
           trendlineTypes,
-          entryTypes
+          entryTypes,
+          tradingTags
         ] = await Promise.all([
           fetch('/api/options/trade-types').then((r) => r.json()),
           fetch('/api/options/commodities').then((r) => r.json()),
           fetch('/api/options/timeframes').then((r) => r.json()),
           fetch('/api/options/trendline-types').then((r) => r.json()),
-          fetch('/api/options/entry-types').then((r) => r.json())
+          fetch('/api/options/entry-types').then((r) => r.json()),
+          fetch('/api/options/trading-tags').then((r) => r.json())
         ])
 
         setOptions({
@@ -148,7 +157,8 @@ export function TradeModal({
           commodities: commodities.data || [],
           timeframes: timeframes.data || [],
           trendlineTypes: trendlineTypes.data || [],
-          entryTypes: entryTypes.data || []
+          entryTypes: entryTypes.data || [],
+          tradingTags: tradingTags.data || []
         })
         
         console.log('Options loaded:', {
@@ -156,7 +166,8 @@ export function TradeModal({
           commodities: commodities.data?.length,
           timeframes: timeframes.data?.length,
           trendlineTypes: trendlineTypes.data?.length,
-          entryTypes: entryTypes.data?.length
+          entryTypes: entryTypes.data?.length,
+          tradingTags: tradingTags.data?.length
         })
       } catch (error) {
         console.error('Failed to load options:', error)
@@ -180,6 +191,8 @@ export function TradeModal({
         trendlineTypeId: trade.trendlineType?.id || '',
         position: trade.position || 'LONG',
         entryTypeIds: trade.entryTypes.map((et) => et.id),
+        tagIds: trade.tradeTags?.map((tt) => tt.tag.id) || [],
+        holdingTimeMinutes: trade.holdingTimeMinutes || undefined,
         stopLossTicks: trade.stopLossTicks,
         targetR: trade.targetR,
         actualExitR: trade.actualExitR,
@@ -189,10 +202,12 @@ export function TradeModal({
         screenshots: []
       })
       // 載入現有圖片
+      const existingImages = (trade.screenshotUrls as CloudinaryImage[]) || []
       setImageValue({
         newFiles: [],
-        existingImages: (trade.screenshotUrls as CloudinaryImage[]) || []
+        existingImages
       })
+      setInitialImageCount(existingImages.length)
     } else if (open && !trade) {
       // 新增模式，重置表單
       reset({
@@ -200,12 +215,14 @@ export function TradeModal({
         orderDate: new Date(),
         position: 'LONG',
         entryTypeIds: [],
+        tagIds: [],
         screenshots: []
       })
       setImageValue({
         newFiles: [],
         existingImages: []
       })
+      setInitialImageCount(0)
     }
   }, [open, trade, reset])
 
@@ -213,6 +230,7 @@ export function TradeModal({
   const stopLossTicks = watch('stopLossTicks')
   const targetR = watch('targetR')
   const actualExitR = watch('actualExitR')
+  const watchedTradeDate = watch('tradeDate')
 
   // 計算目標點數（僅顯示，不儲存）
   const targetTicks =
@@ -325,19 +343,25 @@ export function TradeModal({
 
   // 處理多選 Checkbox
   const handleCheckboxChange = (
-    field: 'entryTypeIds',
+    field: 'entryTypeIds' | 'tagIds',
     value: string,
     checked: boolean
   ) => {
     const currentValues = watch(field) || []
     if (checked) {
-      setValue(field, [...currentValues, value])
+      setValue(field, [...currentValues, value], { shouldDirty: true })
     } else {
       setValue(
         field,
-        currentValues.filter((v) => v !== value)
+        currentValues.filter((v) => v !== value),
+        { shouldDirty: true }
       )
     }
+  }
+
+  // 明確的關閉函數（用於取消按鈕）
+  const handleExplicitClose = () => {
+    onOpenChange(false)
   }
 
   return (
@@ -347,10 +371,24 @@ export function TradeModal({
         <DialogContent 
           className='max-h-[90vh] w-full sm:max-w-[900px] flex flex-col overflow-hidden p-0'
           background={<Fireworks active={!!actualExitR && Number(actualExitR) > 1} />}
+          onPointerDownOutside={(e) => {
+            const hasNewImages = imageValue.newFiles.length > 0
+            const hasDeletedImages = imageValue.existingImages.length !== initialImageCount
+            const hasImageChanges = hasNewImages || hasDeletedImages
+            if (isDirty || hasImageChanges) {
+              e.preventDefault()
+            }
+          }}
         >
           <DialogHeader className='shrink-0 border-b px-6 pt-6 pb-4'>
-            <DialogTitle>
-              {isEditMode ? '編輯交易紀錄' : '新增交易紀錄'}
+            <DialogTitle className="flex items-center gap-3">
+              <span>{isEditMode ? '編輯交易紀錄' : '新增交易紀錄'}</span>
+              {(isDirty || imageValue.newFiles.length > 0 || imageValue.existingImages.length !== initialImageCount) && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  未儲存
+                </span>
+              )}
             </DialogTitle>
             <DialogDescription asChild>
               <div>
@@ -393,30 +431,15 @@ export function TradeModal({
                   control={control}
                   name='tradeDate'
                   render={({ field }) => (
-                    <Popover modal={true}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant='outline'
-                          className={cn(
-                            'w-full justify-start text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          <CalendarIcon className='mr-2 h-4 w-4' />
-                          {field.value
-                            ? format(field.value, 'yyyy-MM-dd')
-                            : '選擇日期'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className='w-auto p-0' align='start'>
-                        <Calendar
-                          mode='single'
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <Input
+                      type="datetime-local"
+                      value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ''}
+                      onChange={(e) => {
+                        const date = e.target.value ? new Date(e.target.value) : new Date()
+                        field.onChange(date)
+                      }}
+                      className="w-full"
+                    />
                   )}
                 />
                 {errors.tradeDate && (
@@ -811,6 +834,86 @@ export function TradeModal({
               </div>
             </div>
 
+            {/* 自定義標籤（多選，非必填）*/}
+            <div className='space-y-2'>
+              <Label>自定義標籤（可多選）</Label>
+              <div className='grid grid-cols-2 md:grid-cols-3 gap-3 p-4 border rounded-lg'>
+                {options.tradingTags.length > 0 ? (
+                  options.tradingTags.map((tag) => (
+                    <div key={tag.id} className='flex items-center space-x-2'>
+                      <Checkbox
+                        id={`tag-${tag.id}`}
+                        checked={watch('tagIds')?.includes(tag.id)}
+                        onCheckedChange={(checked) =>
+                          handleCheckboxChange(
+                            'tagIds',
+                            tag.id,
+                            checked as boolean
+                          )
+                        }
+                      />
+                      <label
+                        htmlFor={`tag-${tag.id}`}
+                        className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer'
+                      >
+                        {tag.name}
+                      </label>
+                    </div>
+                  ))
+                ) : (
+                  <p className='text-sm text-muted-foreground col-span-full text-center py-2'>
+                    尚無標籤，請至設定頁面新增
+                  </p>
+                )}
+              </div>
+              {errors.tagIds && (
+                <p className='text-sm text-destructive'>
+                  {errors.tagIds.message}
+                </p>
+              )}
+            </div>
+
+            {/* 第四排：持倉時間、交易時段 */}
+            <div className='grid grid-cols-2 gap-4'>
+              {/* 持倉時間 */}
+              <div className='space-y-2'>
+                <Label htmlFor='holdingTimeMinutes'>持倉時間（分鐘）</Label>
+                <Input
+                  id='holdingTimeMinutes'
+                  type='number'
+                  {...register('holdingTimeMinutes')}
+                  placeholder='例如：120'
+                />
+                {errors.holdingTimeMinutes && (
+                  <p className='text-sm text-destructive'>
+                    {errors.holdingTimeMinutes.message}
+                  </p>
+                )}
+                <p className='text-xs text-muted-foreground'>
+                  從進場到出場的時間長度
+                </p>
+              </div>
+
+              {/* 交易時段（自動判斷）*/}
+              <div className='space-y-2'>
+                <Label>交易時段（自動判斷）</Label>
+                <div className='h-10 px-3 py-2 border rounded-md bg-muted flex items-center'>
+                  {watchedTradeDate ? (
+                    <span className='text-sm font-medium'>
+                      {getTradingSessionLabel(determineTradingSession(watchedTradeDate))}
+                    </span>
+                  ) : (
+                    <span className='text-sm text-muted-foreground'>
+                      請先選擇交易日期
+                    </span>
+                  )}
+                </div>
+                <p className='text-xs text-muted-foreground'>
+                  根據交易日期時間自動計算
+                </p>
+              </div>
+            </div>
+
             {/* 備註 */}
             <div className='space-y-2'>
               <Label htmlFor='notes'>備註</Label>
@@ -838,7 +941,7 @@ export function TradeModal({
             <Button
               type='button'
               variant='outline'
-              onClick={() => onOpenChange(false)}
+              onClick={handleExplicitClose}
               disabled={isSubmitting}
             >
               取消

@@ -35,6 +35,9 @@ import {
   TrendingUp,
   Circle,
   ArrowRight,
+  Globe,
+  Tag,
+  Timer,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -108,6 +111,21 @@ const NAV_GROUPS: NavGroup[] = [
             href: '/analytics/entry-type',
             icon: ArrowRight,
           },
+          {
+            title: '交易時段分析',
+            href: '/analytics/trading-session',
+            icon: Globe,
+          },
+          {
+            title: '自定義標籤分析',
+            href: '/analytics/tags',
+            icon: Tag,
+          },
+          {
+            title: '持倉時間分析',
+            href: '/analytics/holding-time',
+            icon: Timer,
+          },
         ],
       },
     ],
@@ -143,6 +161,11 @@ const NAV_GROUPS: NavGroup[] = [
             title: '進場類型',
             href: '/settings/entry-types',
             icon: ArrowRight,
+          },
+          {
+            title: '自定義標籤',
+            href: '/settings/trading-tags',
+            icon: Tag,
           },
         ],
       },

@@ -122,6 +122,8 @@ export async function POST(request: NextRequest) {
         : undefined,
       createdAt: trade.createdAt,
       updatedAt: trade.updatedAt,
+      isFavorite: false, // 匯出時暫不需要此資訊
+      collectionCount: 0, // 匯出時暫不需要此資訊
     }))
 
     return NextResponse.json({ data: transformedTrades })

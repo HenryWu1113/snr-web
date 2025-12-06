@@ -109,6 +109,11 @@ export async function POST(request: NextRequest) {
               },
             },
           },
+          _count: {
+            select: {
+              tradeCollections: true,
+            },
+          },
         },
       }),
       prisma.trade.count({
@@ -131,6 +136,8 @@ export async function POST(request: NextRequest) {
       tradingSession: trade.tradingSession as 'ASIAN' | 'LONDON' | 'NEWYORK' | 'OVERLAP' | null,
       holdingTimeMinutes: trade.holdingTimeMinutes,
       tradeTags: trade.tradeTags,
+      isFavorite: trade.isFavorite,
+      collectionCount: trade._count?.tradeCollections || 0,
       stopLossTicks: trade.stopLossTicks,
       targetR: Number(trade.targetR),
       actualExitR: Number(trade.actualExitR),

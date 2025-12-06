@@ -35,14 +35,31 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // 允許的電子郵件白名單
+  const ALLOWED_EMAILS = ['bug910284@gmail.com']
+
   if (
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
+    !request.nextUrl.pathname.startsWith('/auth') &&
+    !request.nextUrl.pathname.startsWith('/unauthorized')
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+
+  // 檢查使用者電子郵件是否在白名單中
+  if (
+    user &&
+    !ALLOWED_EMAILS.includes(user.email || '') &&
+    !request.nextUrl.pathname.startsWith('/unauthorized') &&
+    !request.nextUrl.pathname.startsWith('/auth/logout')
+  ) {
+    // 使用者已登入但電子郵件不在白名單中，重定向到未授權頁面
+    const url = request.nextUrl.clone()
+    url.pathname = '/unauthorized'
     return NextResponse.redirect(url)
   }
 

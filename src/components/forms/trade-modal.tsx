@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
-import { CalendarIcon, Loader2 } from 'lucide-react'
+import { CalendarIcon, Loader2, Heart, Bookmark } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -50,6 +50,8 @@ import type { TradeWithRelations } from '@/types/datatable'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { determineTradingSession, getTradingSessionLabel } from '@/lib/trading-session'
+import { CollectionDialog } from '@/components/dialogs/collection-dialog'
+import { toast as sonnerToast } from 'sonner'
 
 interface TradeModalProps {
   open: boolean
@@ -93,6 +95,9 @@ export function TradeModal({
     existingImages: []
   })
   const [initialImageCount, setInitialImageCount] = useState(0)
+  const [isFavorite, setIsFavorite] = useState(trade?.isFavorite || false)
+  const [showCollectionDialog, setShowCollectionDialog] = useState(false)
+  const [hasCollections, setHasCollections] = useState(false)
 
   const {
     register,
@@ -104,7 +109,7 @@ export function TradeModal({
     formState: { errors, isDirty }
   } = useForm<TradeFormData>({
     resolver: zodResolver(tradeFormSchema) as any,
-    defaultValues: trade ? {
+      defaultValues: trade ? {
       tradeDate: new Date(trade.tradeDate),
       orderDate: new Date(trade.orderDate),
       tradeTypeId: trade.tradeType?.id || '',
@@ -125,9 +130,20 @@ export function TradeModal({
     } : {
       tradeDate: new Date(),
       orderDate: new Date(),
+      tradeTypeId: '',
+      commodityId: '',
+      timeframeId: '',
+      trendlineTypeId: '',
       position: 'LONG',
       entryTypeIds: [],
       tagIds: [],
+      holdingTimeMinutes: undefined,
+      stopLossTicks: undefined,
+      targetR: undefined,
+      actualExitR: undefined,
+      leverage: undefined,
+      profitLoss: undefined,
+      notes: '',
       screenshots: []
     }
   })
@@ -181,43 +197,63 @@ export function TradeModal({
 
   // 當編輯模式時，載入交易資料
   useEffect(() => {
-    if (open && trade) {
-      reset({
-        tradeDate: new Date(trade.tradeDate),
-        orderDate: new Date(trade.orderDate),
-        tradeTypeId: trade.tradeType?.id || '',
-        commodityId: trade.commodity?.id || '',
-        timeframeId: trade.timeframe?.id || '',
-        trendlineTypeId: trade.trendlineType?.id || '',
-        position: trade.position || 'LONG',
-        entryTypeIds: trade.entryTypes.map((et) => et.id),
-        tagIds: trade.tradeTags?.map((tt) => tt.tag.id) || [],
-        holdingTimeMinutes: trade.holdingTimeMinutes || undefined,
-        stopLossTicks: trade.stopLossTicks,
-        targetR: trade.targetR,
-        actualExitR: trade.actualExitR,
-        leverage: trade.leverage,
-        profitLoss: trade.profitLoss,
-        notes: trade.notes || '',
-        screenshots: []
-      })
-      // 載入現有圖片
-      const existingImages = (trade.screenshotUrls as CloudinaryImage[]) || []
-      setImageValue({
-        newFiles: [],
-        existingImages
-      })
-      setInitialImageCount(existingImages.length)
-    } else if (open && !trade) {
-      // 新增模式，重置表單
-      reset({
-        tradeDate: new Date(),
-        orderDate: new Date(),
-        position: 'LONG',
-        entryTypeIds: [],
-        tagIds: [],
-        screenshots: []
-      })
+    if (open) {
+      if (trade) {
+        reset({
+          tradeDate: new Date(trade.tradeDate),
+          orderDate: new Date(trade.orderDate),
+          tradeTypeId: trade.tradeType?.id || '',
+          commodityId: trade.commodity?.id || '',
+          timeframeId: trade.timeframe?.id || '',
+          trendlineTypeId: trade.trendlineType?.id || '',
+          position: trade.position || 'LONG',
+          entryTypeIds: trade.entryTypes.map((et) => et.id),
+          tagIds: trade.tradeTags?.map((tt) => tt.tag.id) || [],
+          holdingTimeMinutes: trade.holdingTimeMinutes || undefined,
+          stopLossTicks: trade.stopLossTicks,
+          targetR: trade.targetR,
+          actualExitR: trade.actualExitR,
+          leverage: trade.leverage,
+          profitLoss: trade.profitLoss,
+          notes: trade.notes || '',
+          screenshots: []
+        })
+        // 載入現有圖片
+        const existingImages = (trade.screenshotUrls as CloudinaryImage[]) || []
+        setImageValue({
+          newFiles: [],
+          existingImages
+        })
+        setInitialImageCount(existingImages.length)
+      } else {
+        // 新增模式，重置表單
+        reset({
+          tradeDate: new Date(),
+          orderDate: new Date(),
+          tradeTypeId: '',
+          commodityId: '',
+          timeframeId: '',
+          trendlineTypeId: '',
+          position: 'LONG',
+          entryTypeIds: [],
+          tagIds: [],
+          holdingTimeMinutes: undefined,
+          stopLossTicks: undefined,
+          targetR: undefined,
+          actualExitR: undefined,
+          leverage: undefined,
+          profitLoss: undefined,
+          notes: '',
+          screenshots: []
+        })
+        setImageValue({
+          newFiles: [],
+          existingImages: []
+        })
+        setInitialImageCount(0)
+      }
+    } else {
+      // 關閉時重置圖片狀態
       setImageValue({
         newFiles: [],
         existingImages: []
@@ -364,6 +400,37 @@ export function TradeModal({
     onOpenChange(false)
   }
 
+  // 切換喜歡狀態（僅編輯模式）
+  const handleToggleFavorite = async () => {
+    if (!trade) return
+    try {
+      const res = await fetch(`/api/trades/${trade.id}/favorite`, {
+        method: 'PATCH',
+      })
+      if (!res.ok) throw new Error('Failed to toggle favorite')
+      const data = await res.json()
+      setIsFavorite(data.data.isFavorite)
+      sonnerToast.success(data.data.isFavorite ? '已加入喜歡' : '已取消喜歡')
+    } catch (error) {
+      console.error('Error toggling favorite:', error)
+      sonnerToast.error('操作失敗')
+    }
+  }
+
+  // 載入收藏狀態
+  useEffect(() => {
+    if (open && trade) {
+      setIsFavorite(trade.isFavorite || false)
+      // 檢查是否有收藏
+      fetch(`/api/trades/${trade.id}/collections`)
+        .then((res) => res.json())
+        .then((data) => {
+          setHasCollections((data.data?.length || 0) > 0)
+        })
+        .catch(() => setHasCollections(false))
+    }
+  }, [open, trade])
+
   return (
     <>
 
@@ -381,22 +448,59 @@ export function TradeModal({
           }}
         >
           <DialogHeader className='shrink-0 border-b px-6 pt-6 pb-4'>
-            <DialogTitle className="flex items-center gap-3">
-              <span>{isEditMode ? '編輯交易紀錄' : '新增交易紀錄'}</span>
-              {(isDirty || imageValue.newFiles.length > 0 || imageValue.existingImages.length !== initialImageCount) && (
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                  未儲存
-                </span>
-              )}
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span>{isEditMode ? '編輯交易紀錄' : '新增交易紀錄'}</span>
+                {(isDirty || imageValue.newFiles.length > 0 || imageValue.existingImages.length !== initialImageCount) && (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    未儲存
+                  </span>
+                )}
+              </div>
             </DialogTitle>
             <DialogDescription asChild>
               <div>
                 {isEditMode ? (
                   <div className="flex flex-col gap-1 mt-1.5">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="shrink-0">ID:</span>
-                      <span className="font-mono select-all text-foreground/80">{trade?.id}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="shrink-0">ID:</span>
+                        <span className="font-mono select-all text-foreground/80">{trade?.id}</span>
+                      </div>
+                      {/* 喜歡和收藏按鈕 */}
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleToggleFavorite}
+                          className="h-7 w-7 p-0"
+                          title={isFavorite ? '取消喜歡' : '加入喜歡'}
+                        >
+                          <Heart
+                            className={cn(
+                              'h-4 w-4',
+                              isFavorite && 'fill-red-500 text-red-500'
+                            )}
+                          />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowCollectionDialog(true)}
+                          className="h-7 w-7 p-0"
+                          title="加入收藏"
+                        >
+                          <Bookmark
+                            className={cn(
+                              'h-4 w-4',
+                              hasCollections && 'fill-yellow-500 text-yellow-500'
+                            )}
+                          />
+                        </Button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
@@ -965,6 +1069,19 @@ export function TradeModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 收藏對話框 */}
+      {trade && (
+        <CollectionDialog
+          open={showCollectionDialog}
+          onOpenChange={setShowCollectionDialog}
+          tradeId={trade.id}
+          onSuccess={() => {
+            setHasCollections(true)
+            onSuccess?.()
+          }}
+        />
+      )}
     </>
   )
 }

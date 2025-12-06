@@ -5,8 +5,12 @@
 
 'use client'
 
+import Link from 'next/link'
 import { Sidebar } from './sidebar'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Button } from '@/components/ui/button'
+import { Heart, Bookmark } from 'lucide-react'
+
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -26,7 +30,22 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             {/* Breadcrumbs or Page Title could go here */}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            {/* 喜歡按鈕 */}
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/favorites">
+                <Heart className="h-5 w-5" />
+              </Link>
+            </Button>
+
+            {/* 收藏按鈕 */}
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/collections">
+                <Bookmark className="h-5 w-5" />
+              </Link>
+            </Button>
+
+            {/* 主題切換 */}
             <ThemeToggle />
           </div>
         </header>

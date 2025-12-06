@@ -145,6 +145,24 @@ export function buildTradeWhereClause(
     })
   }
 
+  // 喜歡篩選
+  if (filters.isFavorite !== undefined) {
+    conditions.push({
+      isFavorite: filters.isFavorite,
+    })
+  }
+
+  // 收藏分類篩選
+  if (filters.collectionId) {
+    conditions.push({
+      tradeCollections: {
+        some: {
+          collectionId: filters.collectionId,
+        },
+      },
+    })
+  }
+
   if (conditions.length > 0) {
     where.AND = conditions
   }
@@ -240,7 +258,7 @@ export function normalizeDataTableRequest(
   return {
     pagination: {
       page: Math.max(1, request.pagination?.page || 1),
-      pageSize: Math.min(100, Math.max(10, request.pagination?.pageSize || 20)),
+      pageSize: Math.min(100, Math.max(5, request.pagination?.pageSize || 20)),
     },
     sort: request.sort || [],
     filters: request.filters || {},

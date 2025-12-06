@@ -184,6 +184,12 @@ export interface TradeFilters {
 
   // 關鍵字搜尋（搜尋 notes 欄位）
   keyword?: string
+
+  // 喜歡篩選
+  isFavorite?: boolean
+
+  // 收藏分類篩選
+  collectionId?: string
 }
 
 // ==========================================
@@ -246,6 +252,10 @@ export interface TradeWithRelations {
       name: string
     }
   }>
+
+  // 喜歡和收藏
+  isFavorite: boolean
+  collectionCount: number  // 所屬收藏分類數量
 
   // 交易數據
   stopLossTicks: number

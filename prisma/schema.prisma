@@ -141,6 +141,7 @@ model Trade {
   // 新增欄位
   tradingSession     TradingSession? @map("trading_session") // 交易時段（自動判斷）
   holdingTimeMinutes Int?            @map("holding_time_minutes") // 持倉時間（分鐘）
+  isFavorite         Boolean         @default(false) @map("is_favorite") // 是否喜歡
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -152,8 +153,9 @@ model Trade {
   tradeType     TradeType?     @relation(fields: [tradeTypeId], references: [id], onDelete: SetNull)
 
   // 多對多關聯
-  tradeEntryTypes TradeEntryType[]
-  tradeTags       TradeTag[]
+  tradeEntryTypes  TradeEntryType[]
+  tradeTags        TradeTag[]
+  tradeCollections TradeCollection[] // 收藏關聯
 
   @@index([userId])
   @@index([tradeDate])
@@ -165,6 +167,7 @@ model Trade {
   @@index([winLoss])
   @@index([position])
   @@index([tradingSession])
+  @@index([isFavorite])
   @@map("trades")
 }
 
@@ -198,6 +201,42 @@ model TradeTag {
   @@index([tradeId])
   @@index([tagId])
   @@map("trade_tags")
+}
+
+model TradeCollection {
+  id           String   @id @default(uuid())
+  tradeId      String   @map("trade_id")
+  collectionId String   @map("collection_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  trade      Trade      @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, collectionId])
+  @@index([tradeId])
+  @@index([collectionId])
+  @@map("trade_collections")
+}
+
+// ==========================================
+// 收藏分類 Model
+// ==========================================
+
+model Collection {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  name         String // 收藏分類名稱
+  description  String? // 描述（可選）
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // 多對多關聯
+  tradeCollections TradeCollection[]
+
+  @@unique([userId, name]) // 每個使用者的收藏名稱唯一
+  @@index([userId])
+  @@map("collections")
 }
 
 // ==========================================

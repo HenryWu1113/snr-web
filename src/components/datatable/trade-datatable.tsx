@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/table'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Inbox, SearchX, Pencil, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Inbox, SearchX, Pencil, Trash2, Heart, Bookmark } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
@@ -39,8 +39,23 @@ import { DataTableToolbar } from './datatable-toolbar'
 import { DataTableColumnHeader } from './datatable-column-header'
 import { TradeModal } from '@/components/forms/trade-modal'
 import { DeleteConfirmDialog } from '@/components/dialogs/delete-confirm-dialog'
+import { CollectionDialog } from '@/components/dialogs/collection-dialog'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
-export function TradeDataTable() {
+interface TradeDataTableProps {
+  fixedFilters?: TradeFilters  // 固定過濾條件，不會被清空篩選器影響
+  defaultFilters?: TradeFilters
+  onTradeUpdate?: () => void
+  onTradeDelete?: () => void
+}
+
+export function TradeDataTable({ 
+  fixedFilters = {},
+  defaultFilters = {},
+  onTradeUpdate,
+  onTradeDelete 
+}: TradeDataTableProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -54,7 +69,7 @@ export function TradeDataTable() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [sort, setSort] = useState<MultiSortConfig>(DEFAULT_SORT)
-  const [filters, setFilters] = useState<TradeFilters>({})
+  const [filters, setFilters] = useState<TradeFilters>(defaultFilters)
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(
     DEFAULT_VISIBLE_COLUMNS.reduce((acc, id) => ({ ...acc, [id]: true }), {})
   )
@@ -63,6 +78,7 @@ export function TradeDataTable() {
   const [editingTrade, setEditingTrade] = useState<TradeWithRelations | null>(null)
   const [deletingTradeId, setDeletingTradeId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [collectionTradeId, setCollectionTradeId] = useState<string | null>(null)
 
   // 從資料庫載入使用者設定
   useEffect(() => {
@@ -82,9 +98,14 @@ export function TradeDataTable() {
 
         if (filtersRes.ok) {
           const { settings } = await filtersRes.json()
+          // 合併 defaultFilters 和儲存的 settings，defaultFilters 優先
           if (settings) {
-            setFilters(settings)
+            setFilters({ ...settings, ...defaultFilters })
+          } else {
+            setFilters(defaultFilters)
           }
+        } else {
+          setFilters(defaultFilters)
         }
       } catch (err) {
         console.error('Failed to load preferences:', err)
@@ -96,6 +117,19 @@ export function TradeDataTable() {
 
     loadPreferences()
   }, [])
+
+  // 將 defaultFilters 和 fixedFilters 序列化以穩定依賴
+  const defaultFiltersKey = JSON.stringify(defaultFilters)
+  const fixedFiltersKey = JSON.stringify(fixedFilters)
+
+  // 當 defaultFilters 變化時，更新 filters
+  useEffect(() => {
+    if (preferencesLoaded) {
+      setFilters((prev) => ({ ...prev, ...defaultFilters }))
+      setPage(1) // 重置到第一頁
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultFiltersKey, preferencesLoaded])
 
   // 儲存欄位可見性設定
   const saveColumnVisibility = useCallback(async (visibility: ColumnVisibility) => {
@@ -134,10 +168,13 @@ export function TradeDataTable() {
     setLoading(true)
     setError(null)
 
+    // 合併 filters 和 fixedFilters，fixedFilters 優先（不會被清空）
+    const mergedFilters = { ...filters, ...fixedFilters }
+
     const request: TradeDataTableRequest = {
       pagination: { page, pageSize },
       sort,
-      filters,
+      filters: mergedFilters,
       columnVisibility,
     }
 
@@ -160,7 +197,8 @@ export function TradeDataTable() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, sort, filters, columnVisibility])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, sort, filters, fixedFiltersKey, columnVisibility])
 
   // 當參數變化時重新載入資料（等待偏好設定載入完成）
   useEffect(() => {
@@ -229,6 +267,7 @@ export function TradeDataTable() {
       // 刪除成功，重新載入資料
       await fetchData()
       setDeletingTradeId(null)
+      onTradeDelete?.()
     } catch (error) {
       console.error('Delete error:', error)
       alert('刪除失敗')
@@ -274,7 +313,7 @@ export function TradeDataTable() {
                     />
                   </TableHead>
                 ))}
-                <TableHead style={{ width: 100 }}>操作</TableHead>
+                <TableHead style={{ width: 140 }}>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -331,7 +370,52 @@ export function TradeDataTable() {
                       </TableCell>
                     ))}
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        {/* 喜歡按鈕 */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/trades/${row.id}/favorite`, {
+                                method: 'PATCH',
+                              })
+                              if (!res.ok) throw new Error('Failed to toggle favorite')
+                              await fetchData()
+                              toast.success(
+                                row.isFavorite ? '已取消喜歡' : '已加入喜歡'
+                              )
+                              onTradeUpdate?.()
+                            } catch (error) {
+                              toast.error('操作失敗')
+                            }
+                          }}
+                          className="h-8 w-8 p-0"
+                          title={row.isFavorite ? '取消喜歡' : '加入喜歡'}
+                        >
+                          <Heart
+                            className={cn(
+                              'h-4 w-4',
+                              row.isFavorite && 'fill-red-500 text-red-500'
+                            )}
+                          />
+                        </Button>
+                        {/* 收藏按鈕 */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCollectionTradeId(row.id)}
+                          className="h-8 w-8 p-0"
+                          title="加入收藏"
+                        >
+                          <Bookmark
+                            className={cn(
+                              'h-4 w-4',
+                              row.collectionCount > 0 && 'fill-yellow-500 text-yellow-500'
+                            )}
+                          />
+                        </Button>
+                        {/* 編輯按鈕 */}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -340,6 +424,7 @@ export function TradeDataTable() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
+                        {/* 刪除按鈕 */}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -433,6 +518,7 @@ export function TradeDataTable() {
         onSuccess={() => {
           fetchData()
           setEditingTrade(null)
+          onTradeUpdate?.()
         }}
         trade={editingTrade}
       />
@@ -445,6 +531,17 @@ export function TradeDataTable() {
         isDeleting={isDeleting}
         title="確定要刪除這筆交易紀錄嗎？"
         description="刪除後將無法復原，所有相關的交易數據都會被永久刪除。"
+      />
+
+      {/* 收藏選擇對話框 */}
+      <CollectionDialog
+        tradeId={collectionTradeId}
+        open={!!collectionTradeId}
+        onOpenChange={(open) => !open && setCollectionTradeId(null)}
+        onSuccess={() => {
+          fetchData()
+          onTradeUpdate?.()
+        }}
       />
     </div>
   )

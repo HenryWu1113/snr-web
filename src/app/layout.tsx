@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SNR Trading Journal",
+  title: "Henry's Trading Analytics",
   description: "交易紀錄管理系統",
 };
 

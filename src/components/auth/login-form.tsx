@@ -34,7 +34,7 @@ export function LoginForm() {
     <Card className="w-full max-w-md mx-4 shadow-lg">
       <CardHeader className="space-y-1 text-center">
         <CardTitle className="text-3xl font-bold tracking-tight">
-          SNR Trading Journal
+          SNR Trading Analytics
         </CardTitle>
         <CardDescription className="text-base">
           使用 GitHub 帳號登入以管理交易紀錄

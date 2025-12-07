@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/popover'
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
-import { CalendarIcon, Search, RotateCcw } from 'lucide-react'
+import { CalendarIcon, Search, RotateCcw, X } from 'lucide-react'
 import type { TradeFilters } from '@/types/datatable'
 import type { DateRange } from 'react-day-picker'
 import { useAllTradeOptions } from '@/hooks/use-trade-options-query'
@@ -72,7 +72,34 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
 
   // 套用篩選
   const handleApply = () => {
-    onFiltersChange(localFilters)
+    // ⚡ 自動調換最小值和最大值（如果輸入順序錯誤）
+    const correctedFilters = { ...localFilters }
+
+    // 持倉時間
+    if (
+      correctedFilters.holdingTimeMin !== undefined &&
+      correctedFilters.holdingTimeMax !== undefined &&
+      correctedFilters.holdingTimeMin > correctedFilters.holdingTimeMax
+    ) {
+      const temp = correctedFilters.holdingTimeMin
+      correctedFilters.holdingTimeMin = correctedFilters.holdingTimeMax
+      correctedFilters.holdingTimeMax = temp
+    }
+
+    // R 倍數範圍
+    if (
+      correctedFilters.actualExitRMin !== undefined &&
+      correctedFilters.actualExitRMax !== undefined &&
+      correctedFilters.actualExitRMin > correctedFilters.actualExitRMax
+    ) {
+      const temp = correctedFilters.actualExitRMin
+      correctedFilters.actualExitRMin = correctedFilters.actualExitRMax
+      correctedFilters.actualExitRMax = temp
+    }
+
+    // 更新本地狀態（讓 UI 顯示正確的值）
+    setLocalFilters(correctedFilters)
+    onFiltersChange(correctedFilters)
   }
 
   // 重置篩選
@@ -93,71 +120,97 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
           {/* 日期區間 */}
           <div className="space-y-2">
             <Label className="text-xs font-semibold text-muted-foreground">交易日(圖表日期)</Label>
-            <Popover modal={true}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start text-left font-normal h-9">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange?.from ? (
-                    dateRange.to ? (
-                      <>
-                        {format(dateRange.from, 'yyyy/MM/dd', { locale: zhTW })} -{' '}
-                        {format(dateRange.to, 'yyyy/MM/dd', { locale: zhTW })}
-                      </>
+            <div className="flex gap-1">
+              <Popover modal={true}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="flex-1 justify-start text-left font-normal h-9">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange?.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, 'yyyy/MM/dd', { locale: zhTW })} -{' '}
+                          {format(dateRange.to, 'yyyy/MM/dd', { locale: zhTW })}
+                        </>
+                      ) : (
+                        format(dateRange.from, 'yyyy/MM/dd', { locale: zhTW })
+                      )
                     ) : (
-                      format(dateRange.from, 'yyyy/MM/dd', { locale: zhTW })
-                    )
-                  ) : (
-                    <span className="text-muted-foreground">選擇日期範圍</span>
-                  )}
+                      <span className="text-muted-foreground">選擇日期範圍</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange?.from}
+                    selected={dateRange}
+                    onSelect={handleDateRangeChange}
+                    numberOfMonths={2}
+                    locale={zhTW}
+                  />
+                </PopoverContent>
+              </Popover>
+              {dateRange?.from && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => handleDateRangeChange(undefined)}
+                  title="清空"
+                >
+                  <X className="h-4 w-4" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={dateRange?.from}
-                  selected={dateRange}
-                  onSelect={handleDateRangeChange}
-                  numberOfMonths={2}
-                  locale={zhTW}
-                />
-              </PopoverContent>
-            </Popover>
+              )}
+            </div>
           </div>
 
           {/* 下單日區間 */}
           <div className="space-y-2">
             <Label className="text-xs font-semibold text-muted-foreground">下單日</Label>
-            <Popover modal={true}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start text-left font-normal h-9">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {orderDateRange?.from ? (
-                    orderDateRange.to ? (
-                      <>
-                        {format(orderDateRange.from, 'yyyy/MM/dd', { locale: zhTW })} -{' '}
-                        {format(orderDateRange.to, 'yyyy/MM/dd', { locale: zhTW })}
-                      </>
+            <div className="flex gap-1">
+              <Popover modal={true}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="flex-1 justify-start text-left font-normal h-9">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {orderDateRange?.from ? (
+                      orderDateRange.to ? (
+                        <>
+                          {format(orderDateRange.from, 'yyyy/MM/dd', { locale: zhTW })} -{' '}
+                          {format(orderDateRange.to, 'yyyy/MM/dd', { locale: zhTW })}
+                        </>
+                      ) : (
+                        format(orderDateRange.from, 'yyyy/MM/dd', { locale: zhTW })
+                      )
                     ) : (
-                      format(orderDateRange.from, 'yyyy/MM/dd', { locale: zhTW })
-                    )
-                  ) : (
-                    <span className="text-muted-foreground">選擇日期範圍</span>
-                  )}
+                      <span className="text-muted-foreground">選擇日期範圍</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={orderDateRange?.from}
+                    selected={orderDateRange}
+                    onSelect={handleOrderDateRangeChange}
+                    numberOfMonths={2}
+                    locale={zhTW}
+                  />
+                </PopoverContent>
+              </Popover>
+              {orderDateRange?.from && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => handleOrderDateRangeChange(undefined)}
+                  title="清空"
+                >
+                  <X className="h-4 w-4" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={orderDateRange?.from}
-                  selected={orderDateRange}
-                  onSelect={handleOrderDateRangeChange}
-                  numberOfMonths={2}
-                  locale={zhTW}
-                />
-              </PopoverContent>
-            </Popover>
+              )}
+            </div>
           </div>
 
           {/* 交易類型 */}
@@ -359,6 +412,23 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
                   }))
                 }
               />
+              {(localFilters.holdingTimeMin !== undefined || localFilters.holdingTimeMax !== undefined) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() =>
+                    setLocalFilters((prev) => ({
+                      ...prev,
+                      holdingTimeMin: undefined,
+                      holdingTimeMax: undefined,
+                    }))
+                  }
+                  title="清空"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
 
@@ -395,6 +465,23 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
                   }))
                 }
               />
+              {(localFilters.actualExitRMin !== undefined || localFilters.actualExitRMax !== undefined) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() =>
+                    setLocalFilters((prev) => ({
+                      ...prev,
+                      actualExitRMin: undefined,
+                      actualExitRMax: undefined,
+                    }))
+                  }
+                  title="清空"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
 
@@ -405,7 +492,7 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜尋備註..."
-                className="pl-8 h-9"
+                className="pl-8 pr-8 h-9"
                 value={localFilters.keyword ?? ''}
                 onChange={(e) =>
                   setLocalFilters((prev) => ({
@@ -414,6 +501,22 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
                   }))
                 }
               />
+              {localFilters.keyword && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-9 w-9"
+                  onClick={() =>
+                    setLocalFilters((prev) => ({
+                      ...prev,
+                      keyword: undefined,
+                    }))
+                  }
+                  title="清空"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
 

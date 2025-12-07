@@ -5,8 +5,8 @@
 
 'use client'
 
-import { useState } from 'react'
-import { Download, Settings2, Filter, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Download, Settings2, Filter, X, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -16,6 +16,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { DataTableFilters } from './datatable-filters'
 import { exportToCSV, exportToExcel } from '@/lib/export'
@@ -30,6 +41,8 @@ interface DataTableToolbarProps {
   columns: ColumnDef<TradeWithRelations>[]
   data: TradeWithRelations[]
   sort: MultiSortConfig
+  onRefresh?: () => void
+  isLoading?: boolean  // ⚡ 新增：讓 refresh 按鈕旋轉
 }
 
 export function DataTableToolbar({
@@ -40,9 +53,18 @@ export function DataTableToolbar({
   columns,
   data,
   sort,
+  onRefresh,
+  isLoading,
 }: DataTableToolbarProps) {
   const [showFilters, setShowFilters] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [showColumnDialog, setShowColumnDialog] = useState(false)  // ⚡ Dialog 狀態
+  const [localColumnVisibility, setLocalColumnVisibility] = useState(columnVisibility)  // ⚡ 本地狀態
+
+  // 當外部 columnVisibility 變更時同步
+  useEffect(() => {
+    setLocalColumnVisibility(columnVisibility)
+  }, [columnVisibility])
 
   // 計算啟用的篩選器數量
   const activeFiltersCount = Object.entries(filters).filter(([key, value]) => {
@@ -96,6 +118,19 @@ export function DataTableToolbar({
       {/* 上方工具列 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
+          {/* ⚡ 手動刷新按鈕 */}
+          {onRefresh && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+              disabled={isLoading}
+              title="重新載入資料"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          )}
+
           {/* 篩選器按鈕 */}
           <Button
             variant={showFilters ? 'default' : 'outline'}
@@ -143,6 +178,7 @@ export function DataTableToolbar({
                   onCheckedChange={(checked) =>
                     onColumnVisibilityChange(column.id, checked)
                   }
+                  onSelect={(e) => e.preventDefault()}
                 >
                   {column.header}
                 </DropdownMenuCheckboxItem>

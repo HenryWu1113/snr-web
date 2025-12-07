@@ -65,9 +65,6 @@ export function TradeDataTable({
   const stableFixedFilters = useMemo(() => fixedFilters, [JSON.stringify(fixedFilters)])
 
   // 狀態管理
-  const [data, setData] = useState<TradeDataTableResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
 
   // DataTable 參數
@@ -84,6 +81,21 @@ export function TradeDataTable({
   const [deletingTradeId, setDeletingTradeId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [collectionTradeId, setCollectionTradeId] = useState<string | null>(null)
+
+  // ⚡ 建構 React Query 請求參數
+  // 注意：故意不包含 columnVisibility，因為後端不使用它篩選資料
+  const request = useMemo(() => ({
+    pagination: { page, pageSize },
+    sort,
+    filters: { ...filters, ...stableFixedFilters },
+  }), [page, pageSize, sort, filters, stableFixedFilters])
+
+  // ⚡ 使用 React Query 載入資料（1 分鐘快取）
+  // isLoading = 首次載入, isFetching = 任何時候在載入（包括 refetch）
+  const { data, isLoading, isFetching, error, refetch } = useTrades(request)
+  
+  // ⚡ 手動刷新功能
+  const refresh = useRefreshTrades()
 
   // 從資料庫載入使用者設定（只執行一次）
   useEffect(() => {
@@ -139,7 +151,7 @@ export function TradeDataTable({
     }
   }, [stableDefaultFilters, preferencesLoaded])
 
-  // 儲存欄位可見性設定
+  // 儲存欄位可見性設定（不觸發重新載入）
   const saveColumnVisibility = useCallback(async (visibility: ColumnVisibility) => {
     try {
       await fetch('/api/preferences', {
@@ -170,49 +182,6 @@ export function TradeDataTable({
       console.error('Failed to save filters:', err)
     }
   }, [])
-
-  // 載入資料
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    // 合併 filters 和 stableFixedFilters，stableFixedFilters 優先（不會被清空）
-    const mergedFilters = { ...filters, ...stableFixedFilters }
-
-    const request: TradeDataTableRequest = {
-      pagination: { page, pageSize },
-      sort,
-      filters: mergedFilters,
-      columnVisibility,
-    }
-
-    try {
-      const response = await fetch('/api/trades/datatable', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch data')
-      }
-
-      const result: TradeDataTableResponse = await response.json()
-      setData(result)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      console.error('Fetch error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [page, pageSize, sort, filters, stableFixedFilters, columnVisibility])
-
-  // 當參數變化時重新載入資料（等待偏好設定載入完成）
-  useEffect(() => {
-    if (preferencesLoaded) {
-      fetchData()
-    }
-  }, [fetchData, preferencesLoaded])
 
   // 處理排序
   const handleSort = (field: string) => {
@@ -272,7 +241,7 @@ export function TradeDataTable({
       }
 
       // 刪除成功，重新載入資料
-      await fetchData()
+      await refetch()
       setDeletingTradeId(null)
       onTradeDelete?.()
     } catch (error) {
@@ -303,10 +272,22 @@ export function TradeDataTable({
         columns={TRADE_COLUMNS}
         data={data?.data || []}
         sort={sort}
+        onRefresh={refresh}
+        isLoading={isFetching}
       />
 
       {/* 表格 */}
-      <Card className="py-2 gap-0">
+      <Card className="py-2 gap-0 relative">
+        {/* ⚡ Loading 遮罩 - 任何時候資料載入時顯示 */}
+        {isFetching && (
+          <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-20 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="text-sm text-muted-foreground">載入中...</p>
+            </div>
+          </div>
+        )}
+        
         <div className="relative w-full overflow-auto">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
@@ -324,33 +305,19 @@ export function TradeDataTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                // Skeleton loading rows
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {visibleColumns.map((column) => (
-                      <TableCell key={column.id}>
-                        <Skeleton className="h-6 w-full" />
-                      </TableCell>
-                    ))}
-                    <TableCell>
-                      <Skeleton className="h-6 w-full" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : error ? (
+              {error ? (
                 <TableRow>
                   <TableCell colSpan={visibleColumns.length + 1} className="h-48">
                     <div className="flex flex-col items-center justify-center gap-3 text-destructive">
                       <SearchX className="h-12 w-12 opacity-50" />
                       <div className="text-center">
                         <p className="font-semibold">載入失敗</p>
-                        <p className="text-sm text-muted-foreground">{error}</p>
+                        <p className="text-sm text-muted-foreground">{error.message}</p>
                       </div>
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : data && data.data.length === 0 ? (
+              ) : !data || data.data.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={visibleColumns.length + 1} className="h-48">
                     <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -388,7 +355,7 @@ export function TradeDataTable({
                                 method: 'PATCH',
                               })
                               if (!res.ok) throw new Error('Failed to toggle favorite')
-                              await fetchData()
+                              refetch()
                               toast.success(
                                 row.isFavorite ? '已取消喜歡' : '已加入喜歡'
                               )
@@ -523,7 +490,7 @@ export function TradeDataTable({
         open={!!editingTrade}
         onOpenChange={(open) => !open && setEditingTrade(null)}
         onSuccess={() => {
-          fetchData()
+          refetch()
           setEditingTrade(null)
           onTradeUpdate?.()
         }}
@@ -546,7 +513,7 @@ export function TradeDataTable({
         open={!!collectionTradeId}
         onOpenChange={(open) => !open && setCollectionTradeId(null)}
         onSuccess={() => {
-          fetchData()
+          refetch()
           onTradeUpdate?.()
         }}
       />

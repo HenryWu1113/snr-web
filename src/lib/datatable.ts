@@ -163,6 +163,34 @@ export function buildTradeWhereClause(
     })
   }
 
+  // ⚡ 交易時段篩選
+  if (filters.tradingSession) {
+    conditions.push({
+      tradingSession: filters.tradingSession,
+    })
+  }
+
+  // ⚡ 持倉時間篩選（分鐘）
+  if (filters.holdingTimeMin !== undefined || filters.holdingTimeMax !== undefined) {
+    conditions.push({
+      holdingTimeMinutes: {
+        ...(filters.holdingTimeMin !== undefined && { gte: filters.holdingTimeMin }),
+        ...(filters.holdingTimeMax !== undefined && { lte: filters.holdingTimeMax }),
+      },
+    })
+  }
+
+  // ⚡ 標籤篩選（多選）
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    conditions.push({
+      tradeTags: {
+        some: {
+          tagId: { in: filters.tagIds },
+        },
+      },
+    })
+  }
+
   if (conditions.length > 0) {
     where.AND = conditions
   }

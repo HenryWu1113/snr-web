@@ -100,18 +100,18 @@ export const tradeFormSchema = z
   .refine(
     (data) => {
       // 根據勝負狀態驗證損益
-      // 勝利時（actualExitR > 0.1），損益必須為正
-      if (data.actualExitR > 0.1 && data.profitLoss <= 0) {
+      // 勝利時（actualExitR > 0.1），損益不能為負
+      if (data.actualExitR > 0.1 && data.profitLoss < 0) {
         return false
       }
-      // 失敗時（actualExitR < -0.1），損益必須為負
-      if (data.actualExitR < -0.1 && data.profitLoss >= 0) {
+      // 失敗時（actualExitR < -0.1），損益不能為正
+      if (data.actualExitR < -0.1 && data.profitLoss > 0) {
         return false
       }
       return true
     },
     {
-      message: '損益必須符合交易結果：勝利時為正，失敗時為負',
+      message: '損益必須符合交易結果：勝利時不能為負，失敗時不能為正',
       path: ['profitLoss']
     }
   )

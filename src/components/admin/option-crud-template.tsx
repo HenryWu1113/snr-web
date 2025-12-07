@@ -30,6 +30,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
+import { useQueryClient } from '@tanstack/react-query'
+import { invalidateOptions } from '@/hooks/use-trade-options-query'
 import {
   DndContext,
   closestCenter,
@@ -160,6 +162,12 @@ export function OptionCrudTemplate({
   const [usageCount, setUsageCount] = useState<number | null>(null)
   const [checkingUsage, setCheckingUsage] = useState(false)
   const { toast } = useToast()
+  
+  // ⚡ React Query - 用於快取失效
+  const queryClient = useQueryClient()
+  
+  // 從 API endpoint 提取選項類型（例如 '/api/options/commodities' -> 'commodities'）
+  const optionType = apiEndpoint.split('/').pop() || ''
 
   // 拖曳感應器設定
   const sensors = useSensors(
@@ -280,6 +288,9 @@ export function OptionCrudTemplate({
         description: `${singularName}已${editingItem ? '更新' : '新增'}`,
       })
 
+      // ⚡ 讓 React Query 快取失效，表單會自動顯示最新資料
+      invalidateOptions(queryClient, optionType)
+
       setDialogOpen(false)
       loadItems()
     } catch (error) {
@@ -309,6 +320,9 @@ export function OptionCrudTemplate({
         title: '刪除成功',
         description: `${singularName}已刪除`,
       })
+
+      // ⚡ 讓 React Query 快取失效
+      invalidateOptions(queryClient, optionType)
 
       setDeleteDialogOpen(false)
       setDeletingItem(null)
@@ -361,6 +375,9 @@ export function OptionCrudTemplate({
         title: '更新成功',
         description: `${singularName}已${!item.isActive ? '啟用' : '停用'}`,
       })
+
+      // ⚡ 讓 React Query 快取失效
+      invalidateOptions(queryClient, optionType)
 
       loadItems()
     } catch (error) {

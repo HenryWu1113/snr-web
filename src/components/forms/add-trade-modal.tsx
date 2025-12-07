@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
@@ -42,16 +42,12 @@ import {
   type CloudinaryImage
 } from '@/lib/validations/trade'
 import { cn } from '@/lib/utils'
+import { useAllTradeOptions } from '@/hooks/use-trade-options-query'
 
 interface AddTradeModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
-}
-
-interface OptionData {
-  id: string
-  name: string
 }
 
 export function AddTradeModal({
@@ -60,19 +56,9 @@ export function AddTradeModal({
   onSuccess
 }: AddTradeModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [options, setOptions] = useState<{
-    tradeTypes: OptionData[]
-    commodities: OptionData[]
-    timeframes: OptionData[]
-    trendlineTypes: OptionData[]
-    entryTypes: OptionData[]
-  }>({
-    tradeTypes: [],
-    commodities: [],
-    timeframes: [],
-    trendlineTypes: [],
-    entryTypes: []
-  })
+  
+  // ⚡ 使用 React Query 載入選項（自動快取）
+  const { options, isLoading: optionsLoading } = useAllTradeOptions()
 
   const {
     register,
@@ -91,41 +77,6 @@ export function AddTradeModal({
       screenshots: []
     }
   })
-
-  // 載入下拉選單選項
-  useEffect(() => {
-    async function loadOptions() {
-      try {
-        const [
-          tradeTypes,
-          commodities,
-          timeframes,
-          trendlineTypes,
-          entryTypes
-        ] = await Promise.all([
-          fetch('/api/options/trade-types').then((r) => r.json()),
-          fetch('/api/options/commodities').then((r) => r.json()),
-          fetch('/api/options/timeframes').then((r) => r.json()),
-          fetch('/api/options/trendline-types').then((r) => r.json()),
-          fetch('/api/options/entry-types').then((r) => r.json())
-        ])
-
-        setOptions({
-          tradeTypes: tradeTypes.data || [],
-          commodities: commodities.data || [],
-          timeframes: timeframes.data || [],
-          trendlineTypes: trendlineTypes.data || [],
-          entryTypes: entryTypes.data || []
-        })
-      } catch (error) {
-        console.error('Failed to load options:', error)
-      }
-    }
-
-    if (open) {
-      loadOptions()
-    }
-  }, [open])
 
   // 監聽欄位變化以自動計算
   const stopLossTicks = watch('stopLossTicks')

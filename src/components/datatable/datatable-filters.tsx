@@ -29,7 +29,7 @@ import { zhTW } from 'date-fns/locale'
 import { CalendarIcon, Search, RotateCcw } from 'lucide-react'
 import type { TradeFilters } from '@/types/datatable'
 import type { DateRange } from 'react-day-picker'
-import { useTradeOptions } from '@/hooks/use-trade-options'
+import { useAllTradeOptions } from '@/hooks/use-trade-options-query'
 
 interface DataTableFiltersProps {
   filters: TradeFilters
@@ -47,8 +47,8 @@ export function DataTableFilters({ filters, onFiltersChange }: DataTableFiltersP
     to: filters.orderDateTo ? new Date(filters.orderDateTo) : undefined,
   })
 
-  // 載入選項資料 (使用快取 hook)
-  const { options } = useTradeOptions()
+  // 載入選項資料 (使用 React Query 快取)
+  const { options } = useAllTradeOptions()
 
   // 處理日期範圍變更
   const handleDateRangeChange = (range: DateRange | undefined) => {

@@ -52,17 +52,13 @@ import { useToast } from '@/hooks/use-toast'
 import { determineTradingSession, getTradingSessionLabel } from '@/lib/trading-session'
 import { CollectionDialog } from '@/components/dialogs/collection-dialog'
 import { toast as sonnerToast } from 'sonner'
+import { useAllTradeOptions } from '@/hooks/use-trade-options-query'
 
 interface TradeModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
   trade?: TradeWithRelations | null // 如果提供 trade，則為編輯模式
-}
-
-interface OptionData {
-  id: string
-  name: string
 }
 
 export function TradeModal({
@@ -73,21 +69,9 @@ export function TradeModal({
 }: TradeModalProps) {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [options, setOptions] = useState<{
-    tradeTypes: OptionData[]
-    commodities: OptionData[]
-    timeframes: OptionData[]
-    trendlineTypes: OptionData[]
-    entryTypes: OptionData[]
-    tradingTags: OptionData[]
-  }>({
-    tradeTypes: [],
-    commodities: [],
-    timeframes: [],
-    trendlineTypes: [],
-    entryTypes: [],
-    tradingTags: []
-  })
+  
+  // ⚡ 使用 React Query 載入選項（自動快取）
+  const { options, isLoading: optionsLoading } = useAllTradeOptions()
 
   const isEditMode = !!trade
   const [imageValue, setImageValue] = useState<ImageUploadValue>({
@@ -147,53 +131,6 @@ export function TradeModal({
       screenshots: []
     }
   })
-
-  // 載入下拉選單選項
-  useEffect(() => {
-    async function loadOptions() {
-      try {
-        const [
-          tradeTypes,
-          commodities,
-          timeframes,
-          trendlineTypes,
-          entryTypes,
-          tradingTags
-        ] = await Promise.all([
-          fetch('/api/options/trade-types').then((r) => r.json()),
-          fetch('/api/options/commodities').then((r) => r.json()),
-          fetch('/api/options/timeframes').then((r) => r.json()),
-          fetch('/api/options/trendline-types').then((r) => r.json()),
-          fetch('/api/options/entry-types').then((r) => r.json()),
-          fetch('/api/options/trading-tags').then((r) => r.json())
-        ])
-
-        setOptions({
-          tradeTypes: tradeTypes.data || [],
-          commodities: commodities.data || [],
-          timeframes: timeframes.data || [],
-          trendlineTypes: trendlineTypes.data || [],
-          entryTypes: entryTypes.data || [],
-          tradingTags: tradingTags.data || []
-        })
-        
-        console.log('Options loaded:', {
-          tradeTypes: tradeTypes.data?.length,
-          commodities: commodities.data?.length,
-          timeframes: timeframes.data?.length,
-          trendlineTypes: trendlineTypes.data?.length,
-          entryTypes: entryTypes.data?.length,
-          tradingTags: tradingTags.data?.length
-        })
-      } catch (error) {
-        console.error('Failed to load options:', error)
-      }
-    }
-
-    if (open) {
-      loadOptions()
-    }
-  }, [open])
 
   // 當編輯模式時，載入交易資料
   useEffect(() => {

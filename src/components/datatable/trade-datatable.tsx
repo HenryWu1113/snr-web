@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/table'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Inbox, SearchX, Pencil, Trash2, Heart, Bookmark } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Inbox, SearchX, Pencil, Trash2, Heart, Bookmark, RefreshCw } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
@@ -42,6 +42,7 @@ import { DeleteConfirmDialog } from '@/components/dialogs/delete-confirm-dialog'
 import { CollectionDialog } from '@/components/dialogs/collection-dialog'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useTrades, useRefreshTrades } from '@/hooks/use-trades-query'
 
 interface TradeDataTableProps {
   fixedFilters?: TradeFilters  // 固定過濾條件，不會被清空篩選器影響

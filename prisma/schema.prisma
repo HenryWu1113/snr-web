@@ -157,9 +157,12 @@ model Trade {
   tradeTags        TradeTag[]
   tradeCollections TradeCollection[] // 收藏關聯
 
+  // 單一欄位索引
   @@index([userId])
   @@index([tradeDate])
   @@index([orderDate])
+  @@index([createdAt])
+  @@index([updatedAt])
   @@index([commodityId])
   @@index([timeframeId])
   @@index([trendlineTypeId])
@@ -168,6 +171,23 @@ model Trade {
   @@index([position])
   @@index([tradingSession])
   @@index([isFavorite])
+  // 複合索引 - 優化常見查詢模式
+  // 1. 使用者 + 交易日期排序（最常用）
+  @@index([userId, tradeDate(sort: Desc)])
+  // 2. 使用者 + 下單日期排序
+  @@index([userId, orderDate(sort: Desc)])
+  // 3. 使用者 + 商品篩選 + 日期
+  @@index([userId, commodityId, tradeDate])
+  // 4. 使用者 + 交易類型 + 日期
+  @@index([userId, tradeTypeId, tradeDate])
+  // 5. 使用者 + 勝敗篩選 + 日期
+  @@index([userId, winLoss, tradeDate])
+  // 6. 使用者 + 喜歡篩選 + 日期
+  @@index([userId, isFavorite, tradeDate])
+  // 7. 使用者 + 做多做空 + 日期
+  @@index([userId, position, tradeDate])
+  // 8. 使用者 + 交易時段 + 日期
+  @@index([userId, tradingSession, tradeDate])
   @@map("trades")
 }
 
@@ -184,8 +204,9 @@ model TradeEntryType {
   entryType EntryType @relation(fields: [entryTypeId], references: [id], onDelete: Cascade)
 
   @@unique([tradeId, entryTypeId])
-  @@index([tradeId])
-  @@index([entryTypeId])
+  // 複合索引覆蓋常見查詢（tradeId 在前，因為通常以 trade 為主查詢）
+  @@index([tradeId, entryTypeId])
+  @@index([entryTypeId, tradeId]) // 反向索引，用於從 entryType 查詢 trade
   @@map("trade_entry_types")
 }
 
@@ -198,8 +219,9 @@ model TradeTag {
   tag   TradingTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([tradeId, tagId])
-  @@index([tradeId])
-  @@index([tagId])
+  // 複合索引覆蓋常見查詢
+  @@index([tradeId, tagId])
+  @@index([tagId, tradeId]) // 反向索引，用於從 tag 查詢 trade
   @@map("trade_tags")
 }
 
@@ -213,8 +235,10 @@ model TradeCollection {
   collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
 
   @@unique([tradeId, collectionId])
-  @@index([tradeId])
-  @@index([collectionId])
+  // 複合索引覆蓋常見查詢
+  @@index([tradeId, collectionId])
+  @@index([collectionId, tradeId]) // 反向索引，用於查詢某個收藏分類的所有交易
+  @@index([createdAt]) // 按加入時間排序
   @@map("trade_collections")
 }
 
@@ -235,7 +259,9 @@ model Collection {
   tradeCollections TradeCollection[]
 
   @@unique([userId, name]) // 每個使用者的收藏名稱唯一
-  @@index([userId])
+  // 複合索引優化常見查詢
+  @@index([userId, displayOrder]) // 查詢某使用者的收藏分類並排序
+  @@index([userId, createdAt]) // 按建立時間排序
   @@map("collections")
 }
 

@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Table,
@@ -59,6 +59,10 @@ export function TradeDataTable({
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  // ⚡ 使用 useMemo 穩定物件引用，避免無限重新渲染
+  const stableDefaultFilters = useMemo(() => defaultFilters, [JSON.stringify(defaultFilters)])
+  const stableFixedFilters = useMemo(() => fixedFilters, [JSON.stringify(fixedFilters)])
+
   // 狀態管理
   const [data, setData] = useState<TradeDataTableResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -69,7 +73,7 @@ export function TradeDataTable({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [sort, setSort] = useState<MultiSortConfig>(DEFAULT_SORT)
-  const [filters, setFilters] = useState<TradeFilters>(defaultFilters)
+  const [filters, setFilters] = useState<TradeFilters>(stableDefaultFilters)
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(
     DEFAULT_VISIBLE_COLUMNS.reduce((acc, id) => ({ ...acc, [id]: true }), {})
   )
@@ -80,8 +84,10 @@ export function TradeDataTable({
   const [isDeleting, setIsDeleting] = useState(false)
   const [collectionTradeId, setCollectionTradeId] = useState<string | null>(null)
 
-  // 從資料庫載入使用者設定
+  // 從資料庫載入使用者設定（只執行一次）
   useEffect(() => {
+    let mounted = true
+    
     async function loadPreferences() {
       try {
         const [columnsRes, filtersRes] = await Promise.all([
@@ -89,47 +95,48 @@ export function TradeDataTable({
           fetch('/api/preferences?type=datatable_filters'),
         ])
 
+        if (!mounted) return
+
         if (columnsRes.ok) {
           const { settings } = await columnsRes.json()
-          if (settings) {
+          if (settings && mounted) {
             setColumnVisibility(settings)
           }
         }
 
         if (filtersRes.ok) {
           const { settings } = await filtersRes.json()
-          // 合併 defaultFilters 和儲存的 settings，defaultFilters 優先
-          if (settings) {
-            setFilters({ ...settings, ...defaultFilters })
-          } else {
-            setFilters(defaultFilters)
+          if (settings && mounted) {
+            setFilters({ ...settings, ...stableDefaultFilters })
+          } else if (mounted) {
+            setFilters(stableDefaultFilters)
           }
-        } else {
-          setFilters(defaultFilters)
+        } else if (mounted) {
+          setFilters(stableDefaultFilters)
         }
       } catch (err) {
         console.error('Failed to load preferences:', err)
       } finally {
-        // 標記偏好設定已載入完成
-        setPreferencesLoaded(true)
+        if (mounted) {
+          setPreferencesLoaded(true)
+        }
       }
     }
 
     loadPreferences()
-  }, [])
+    
+    return () => {
+      mounted = false
+    }
+  }, []) // ⚡ 只在 mount 時執行一次
 
-  // 將 defaultFilters 和 fixedFilters 序列化以穩定依賴
-  const defaultFiltersKey = JSON.stringify(defaultFilters)
-  const fixedFiltersKey = JSON.stringify(fixedFilters)
-
-  // 當 defaultFilters 變化時，更新 filters
+  // 當 defaultFilters 變化時，更新 filters（但不重新載入偏好設定）
   useEffect(() => {
     if (preferencesLoaded) {
-      setFilters((prev) => ({ ...prev, ...defaultFilters }))
-      setPage(1) // 重置到第一頁
+      setFilters((prev) => ({ ...prev, ...stableDefaultFilters }))
+      setPage(1)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultFiltersKey, preferencesLoaded])
+  }, [stableDefaultFilters, preferencesLoaded])
 
   // 儲存欄位可見性設定
   const saveColumnVisibility = useCallback(async (visibility: ColumnVisibility) => {
@@ -168,8 +175,8 @@ export function TradeDataTable({
     setLoading(true)
     setError(null)
 
-    // 合併 filters 和 fixedFilters，fixedFilters 優先（不會被清空）
-    const mergedFilters = { ...filters, ...fixedFilters }
+    // 合併 filters 和 stableFixedFilters，stableFixedFilters 優先（不會被清空）
+    const mergedFilters = { ...filters, ...stableFixedFilters }
 
     const request: TradeDataTableRequest = {
       pagination: { page, pageSize },
@@ -197,8 +204,7 @@ export function TradeDataTable({
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, sort, filters, fixedFiltersKey, columnVisibility])
+  }, [page, pageSize, sort, filters, stableFixedFilters, columnVisibility])
 
   // 當參數變化時重新載入資料（等待偏好設定載入完成）
   useEffect(() => {

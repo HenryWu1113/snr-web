@@ -4,7 +4,7 @@ import { useRef, useEffect } from 'react'
 import * as THREE from 'three'
 
 const GRAVITY = -9.8
-const COUNT = 8 // Number of simultaneous fireworks
+const COUNT = 5 // 中間值：同時存在的煙火數量
 
 interface Particle {
   x: number
@@ -91,7 +91,7 @@ export function Fireworks({ active }: { active: boolean }) {
       lastTime = time
 
       // Spawn new fireworks
-      if (fireworksRef.current.length < COUNT && Math.random() < 0.05) {
+      if (fireworksRef.current.length < COUNT && Math.random() < 0.035) {
         spawnFirework(scene)
       }
 
@@ -104,13 +104,13 @@ export function Fireworks({ active }: { active: boolean }) {
 
     requestRef.current = requestAnimationFrame(animate)
 
-    // Spawn initial fireworks for immediate effect
-    for(let i=0; i<5; i++) {
+    // Spawn initial fireworks
+    for(let i=0; i<3; i++) {
       setTimeout(() => {
         if(sceneRef.current) {
           spawnFirework(sceneRef.current)
         }
-      }, i * 200)
+      }, i * 250)
     }
 
     // Handle Resize
@@ -148,16 +148,19 @@ export function Fireworks({ active }: { active: boolean }) {
 
   // Helper functions remain the same...
   const spawnFirework = (scene: THREE.Scene) => {
-    // ... (same as before)
     const id = nextIdRef.current++
-    const x = (Math.random() - 0.5) * 10
-    const y = (Math.random() - 0.5) * 6
-    const z = (Math.random() - 0.5) * 5
+    
+    // ⚡ 讓煙火出現在表單外側（畫面邊緣）
+    // 隨機選擇左側或右側
+    const side = Math.random() > 0.5 ? 1 : -1
+    const x = side * (4 + Math.random() * 4) // 距離中心 4-8 單位
+    const y = (Math.random() - 0.3) * 6 // 稍微偏上
+    const z = (Math.random() - 0.5) * 3
 
     const colors = ['#ff0040', '#00ff40', '#0040ff', '#ffff00', '#ff00ff', '#00ffff']
     const color = new THREE.Color(colors[Math.floor(Math.random() * colors.length)])
 
-    const count = Math.floor(150 + Math.random() * 100)
+    const count = Math.floor(80 + Math.random() * 70) // 中間值：80-150 粒子
     const particles: Particle[] = []
     const positions = new Float32Array(count * 3)
 

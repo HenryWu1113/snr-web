@@ -241,13 +241,13 @@ export function Sidebar({ className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'relative flex flex-col h-screen bg-card border-r border-border transition-all duration-300',
+        'relative flex flex-col h-screen min-h-0 bg-card border-r border-border transition-all duration-300 overflow-hidden',
         collapsed ? 'w-16' : 'w-64',
         className
       )}
     >
       {/* Logo & Toggle */}
-      <div className="flex items-center justify-between h-16 px-4 border-b border-border">
+      <div className="flex items-center justify-between h-16 shrink-0 px-4 border-b border-border">
         {!collapsed && (
           <Link href="/" className="flex items-center gap-3">
             {mounted && (
@@ -279,7 +279,7 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-4">
+      <ScrollArea className="flex-1 min-h-0 px-3 py-4 overflow-y-auto">
         <nav className="space-y-6">
           {NAV_GROUPS.map((group, groupIndex) => (
             <div key={groupIndex}>
@@ -393,7 +393,7 @@ export function Sidebar({ className }: SidebarProps) {
       </ScrollArea>
 
       {/* Bottom Section (User / Logout) */}
-      <div className="border-t border-border p-3">
+      <div className="border-t border-border p-3 shrink-0">
         <Button
           variant="ghost"
           onClick={() => setShowLogoutDialog(true)}

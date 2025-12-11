@@ -11,6 +11,7 @@ import { X, Upload, Clipboard, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ImageLightbox } from '@/components/ui/image-lightbox'
 import type { CloudinaryImage } from '@/lib/validations/trade'
+import { useIsTouchDevice } from '@/hooks/use-is-touch-device'
 
 interface ImageFile {
   id: string
@@ -51,6 +52,7 @@ export function ImageUploadWithExisting({
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const isTouchDevice = useIsTouchDevice()
 
   // 生成預覽（包含新檔案和現有圖片）
   useEffect(() => {
@@ -252,7 +254,14 @@ export function ImageUploadWithExisting({
                     setLightboxOpen(true)
                   }}
                 />
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                {/* 操作按鈕覆蓋層 - 觸控設備永久顯示，桌面設備 hover 顯示 */}
+                <div 
+                  className={`absolute inset-0 transition-opacity flex items-center justify-center gap-2 ${
+                    isTouchDevice 
+                      ? 'bg-black/40' 
+                      : 'bg-black/60 opacity-0 group-hover:opacity-100'
+                  }`}
+                >
                   <Button
                     type="button"
                     variant="secondary"

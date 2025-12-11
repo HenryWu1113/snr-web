@@ -82,6 +82,11 @@ export function TradeModal({
   const [isFavorite, setIsFavorite] = useState(trade?.isFavorite || false)
   const [showCollectionDialog, setShowCollectionDialog] = useState(false)
   const [hasCollections, setHasCollections] = useState(false)
+  
+  // 交易日期的時間狀態
+  const [tradeDateHours, setTradeDateHours] = useState('00')
+  const [tradeDateMinutes, setTradeDateMinutes] = useState('00')
+
 
   const {
     register,
@@ -162,6 +167,11 @@ export function TradeModal({
           existingImages
         })
         setInitialImageCount(existingImages.length)
+        
+        // 載入交易日期的時間
+        const tradeDateTime = new Date(trade.tradeDate)
+        setTradeDateHours(tradeDateTime.getHours().toString().padStart(2, '0'))
+        setTradeDateMinutes(tradeDateTime.getMinutes().toString().padStart(2, '0'))
       } else {
         // 新增模式，重置表單
         reset({
@@ -188,6 +198,11 @@ export function TradeModal({
           existingImages: []
         })
         setInitialImageCount(0)
+        
+        // 新增模式，設置當前時間
+        const now = new Date()
+        setTradeDateHours(now.getHours().toString().padStart(2, '0'))
+        setTradeDateMinutes(now.getMinutes().toString().padStart(2, '0'))
       }
     } else {
       // 關閉時重置圖片狀態
@@ -379,7 +394,22 @@ export function TradeModal({
             const hasNewImages = imageValue.newFiles.length > 0
             const hasDeletedImages = imageValue.existingImages.length !== initialImageCount
             const hasImageChanges = hasNewImages || hasDeletedImages
-            if (isDirty || hasImageChanges) {
+            
+            // 檢查是否點擊在原生日期選擇器上（iOS/iPadOS 會在 body 外渲染原生控制項）
+            const target = e.target as HTMLElement
+            const isDateTimeInput = target?.tagName === 'INPUT' && 
+              (target as HTMLInputElement).type === 'datetime-local'
+            
+            // 如果有未保存的更改，或者正在與日期選擇器互動，則阻止關閉
+            if (isDirty || hasImageChanges || isDateTimeInput) {
+              e.preventDefault()
+            }
+          }}
+          onInteractOutside={(e) => {
+            // 額外阻止 iOS 日期選擇器觸發的關閉行為
+            const target = e.target as HTMLElement
+            if (target?.closest('[data-radix-popper-content-wrapper]') || 
+                target?.tagName === 'INPUT') {
               e.preventDefault()
             }
           }}
@@ -472,15 +502,85 @@ export function TradeModal({
                   control={control}
                   name='tradeDate'
                   render={({ field }) => (
-                    <Input
-                      type="datetime-local"
-                      value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ''}
-                      onChange={(e) => {
-                        const date = e.target.value ? new Date(e.target.value) : new Date()
-                        field.onChange(date)
-                      }}
-                      className="w-full"
-                    />
+                    <Popover modal={true}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant='outline'
+                          className={cn(
+                            'w-full justify-start text-left font-normal',
+                            !field.value && 'text-muted-foreground'
+                          )}
+                        >
+                          <CalendarIcon className='mr-2 h-4 w-4' />
+                          {field.value
+                            ? format(field.value, 'yyyy-MM-dd HH:mm')
+                            : '選擇交易日期和時間'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className='w-auto p-0' align='start'>
+                        <div className='flex flex-col'>
+                          <Calendar
+                            mode='single'
+                            selected={field.value}
+                            onSelect={(date) => {
+                              if (!date) return
+                              const newDateTime = new Date(date)
+                              newDateTime.setHours(parseInt(tradeDateHours) || 0)
+                              newDateTime.setMinutes(parseInt(tradeDateMinutes) || 0)
+                              field.onChange(newDateTime)
+                            }}
+                            initialFocus
+                          />
+                          <div className='border-t p-3'>
+                            <div className='flex items-center justify-center gap-2'>
+                              <div className='flex flex-col items-center'>
+                                <label className='text-xs text-muted-foreground mb-1'>
+                                  時
+                                </label>
+                                <Input
+                                  type='number'
+                                  min={0}
+                                  max={23}
+                                  value={tradeDateHours}
+                                  onChange={(e) => {
+                                    const h = Math.min(23, Math.max(0, parseInt(e.target.value) || 0))
+                                    setTradeDateHours(h.toString().padStart(2, '0'))
+                                    if (field.value) {
+                                      const newDateTime = new Date(field.value)
+                                      newDateTime.setHours(h)
+                                      field.onChange(newDateTime)
+                                    }
+                                  }}
+                                  className='w-16 text-center h-10 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-auto [&::-webkit-inner-spin-button]:appearance-auto'
+                                />
+                              </div>
+                              <span className='text-xl font-bold mt-5'>:</span>
+                              <div className='flex flex-col items-center'>
+                                <label className='text-xs text-muted-foreground mb-1'>
+                                  分
+                                </label>
+                                <Input
+                                  type='number'
+                                  min={0}
+                                  max={59}
+                                  value={tradeDateMinutes}
+                                  onChange={(e) => {
+                                    const m = Math.min(59, Math.max(0, parseInt(e.target.value) || 0))
+                                    setTradeDateMinutes(m.toString().padStart(2, '0'))
+                                    if (field.value) {
+                                      const newDateTime = new Date(field.value)
+                                      newDateTime.setMinutes(m)
+                                      field.onChange(newDateTime)
+                                    }
+                                  }}
+                                  className='w-16 text-center h-10 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-auto [&::-webkit-inner-spin-button]:appearance-auto'
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 />
                 {errors.tradeDate && (
